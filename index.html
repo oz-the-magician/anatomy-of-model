@@ -17,14 +17,14 @@ iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:var(--v
 .card .k{font-family:var(--mono);font-size:12px;letter-spacing:.3em;color:var(--answer);text-transform:uppercase}
 .card h2{font-family:var(--display);font-weight:400;margin:0;font-size:clamp(34px,7vw,84px);letter-spacing:.02em;text-transform:uppercase;line-height:1;text-shadow:0 0 40px rgba(127,212,255,.35)}
 .card p{font-family:var(--mono);color:var(--dim);margin:0 auto;font-size:clamp(14px,1.8vw,19px);max-width:640px;line-height:1.5}
-.card button{pointer-events:auto;justify-self:center;margin-top:10px;font-family:var(--mono);font-size:13px;color:var(--void);background:var(--answer);border:0;padding:10px 18px;border-radius:2px;cursor:pointer;box-shadow:0 0 24px rgba(255,231,163,.35)}
+.card .btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:10px}.card button.alt{background:transparent;color:var(--answer);border:1px solid var(--answer);box-shadow:none}.card button{pointer-events:auto;justify-self:center;margin-top:10px;font-family:var(--mono);font-size:13px;color:var(--void);background:var(--answer);border:0;padding:10px 18px;border-radius:2px;cursor:pointer;box-shadow:0 0 24px rgba(255,231,163,.35)}
 .card .stars{position:absolute;inset:0;z-index:-1;background-image:radial-gradient(1px 1px at 20% 30%,#fff8,transparent),radial-gradient(1px 1px at 70% 60%,#fff6,transparent),radial-gradient(1.5px 1.5px at 40% 80%,#cfe8ff88,transparent),radial-gradient(1px 1px at 85% 20%,#fff7,transparent),radial-gradient(1px 1px at 10% 70%,#fff5,transparent),radial-gradient(1.5px 1.5px at 55% 15%,#ffe7a388,transparent);animation:zoom 3.2s ease-in forwards}
 @keyframes zoom{from{transform:scale(1);opacity:.4}to{transform:scale(2.4);opacity:1}}
 @media (prefers-reduced-motion:reduce){.card .stars{animation:none}}
 </style>
 
 <div class="bar" id="bar"><span class="lab" id="lab"></span></div>
-<div class="card" id="card"><div class="stars" id="stars"></div><span class="k" id="ck"></span><h2 id="ch"></h2><p id="cp"></p><button id="cb" hidden></button></div>
+<div class="card" id="card"><div class="stars" id="stars"></div><span class="k" id="ck"></span><h2 id="ch"></h2><p id="cp"></p><div class="btns"><button id="cb" hidden></button><button id="cb2" hidden></button></div></div>
 
 <script src="voice.js"></script>
 <script>
@@ -48,15 +48,15 @@ const cardDur=i=>{const c=VC[LANG]&&VC[LANG].cards[i];return c?c[1]:0};
 const chDurs=i=>((VC[LANG]&&VC[LANG].ch[i])||[]).map(c=>c?c[1]:0);
 function prime(){for(const l in AUD){[...AUD[l].cards,...AUD[l].ch.flat()].forEach(a=>{if(!a)return;a.muted=true;a.play().then(()=>{a.pause();a.currentTime=0;a.muted=false}).catch(()=>{a.muted=false})})}}
 const btns=[0,1,2].map(i=>{const b=document.createElement('button');b.onclick=()=>goto(i);$('bar').appendChild(b);return b});
-function texts(){document.documentElement.lang=LANG;$('lab').textContent=L().lab;btns.forEach((b,i)=>b.textContent=(i+1)+' · '+L().ch[i]);vtxt();
+function texts(){document.documentElement.lang=LANG;$('lab').textContent=L().lab;btns.forEach((b,i)=>b.textContent=(i+1)+' · '+L().ch[i]);vtxt();lb.textContent=LANG==='ru'?'EN':'RU';
  if(cur>=0&&cardShown){if(cardKind==='end')fillEnd();else fillCard(cur)}}
 const vb=document.createElement('button');vb.onclick=()=>{voiceOn=!voiceOn;try{localStorage.setItem('storyvoice',voiceOn?'1':'0')}catch(e){}if(!voiceOn)stopV();vtxt()};
 function vtxt(){vb.textContent=voiceOn?L().vOn:L().vOff;vb.classList.toggle('on',voiceOn)}$('bar').appendChild(vb);
 addEventListener('storage',e=>{if(e.key==='anatlang'){readLang();texts()}});
 
 let cur=-1,frame=null,cardShown=false,cardKind='',timer=0,started=false;
-function fillCard(i){$('ck').textContent=L().k[i];$('ch').textContent=L().ch[i];$('cp').textContent=L().sub[i];$('cb').hidden=started;$('cb').textContent=L().start}
-function fillEnd(){$('ck').textContent=L().k[3];$('ch').textContent=L().endH;$('cp').textContent=L().end;$('cb').hidden=false;$('cb').textContent=L().again}
+function fillCard(i){$('ck').textContent=L().k[i];$('ch').textContent=L().ch[i];$('cp').textContent=L().sub[i];const s=!started&&i===0;$('cb').hidden=started;$('cb2').hidden=!s;$('cb').textContent=s?'▶ Русский':L().start;$('cb2').textContent='▶ English';$('cb').classList.toggle('alt',s&&LANG!=='ru');$('cb2').classList.toggle('alt',LANG!=='en')}
+function fillEnd(){$('ck').textContent=L().k[3];$('ch').textContent=L().endH;$('cp').textContent=L().end;$('cb').hidden=false;$('cb2').hidden=true;$('cb').classList.remove('alt');$('cb').textContent=L().again}
 function showCard(){cardShown=true;const c=$('card');c.hidden=false;const s=$('stars');s.style.animation='none';void s.offsetWidth;s.style.animation='';requestAnimationFrame(()=>c.style.opacity=1)}
 function hideCard(){cardShown=false;const c=$('card');c.style.opacity=0;setTimeout(()=>{if(!cardShown)c.hidden=true},800)}
 function goto(i){clearTimeout(timer);cur=i;cardKind='ch';btns.forEach((b,k)=>b.classList.toggle('on',k===i));fillCard(i);showCard();
@@ -65,7 +65,11 @@ function goto(i){clearTimeout(timer);cur=i;cardKind='ch';btns.forEach((b,k)=>b.c
  f.onload=()=>{if(old)old.remove();if(started){playCard(i);timer=setTimeout(()=>go(f),Math.max(2600,cardDur(i)*1000+1000))}}}
 function playCard(i){const a=AUD[LANG]&&AUD[LANG].cards[i];stopV();if(a)setTimeout(()=>play(a),350)}
 function go(f){if(f!==frame)return;f.style.opacity=1;f.contentWindow.postMessage({t:'go',vo:chDurs(cur)},'*');hideCard();try{f.focus()}catch(e){}}
-$('cb').onclick=()=>{prime();if(cardKind==='end'){goto(0);return}started=true;$('cb').hidden=true;playCard(cur);timer=setTimeout(()=>go(frame),Math.max(500,cardDur(cur)*1000+1000))};
+function setLang(l){if(l===LANG)return;LANG=l;try{localStorage.setItem('anatlang',l)}catch(e){}texts();if(frame&&frame.contentWindow)frame.contentWindow.postMessage({t:'lang',l},'*')}
+const lb=document.createElement('button');lb.onclick=()=>setLang(LANG==='ru'?'en':'ru');$('bar').appendChild(lb);
+function startIn(l){if(!started)setLang(l);prime();started=true;$('cb').hidden=true;$('cb2').hidden=true;playCard(cur);timer=setTimeout(()=>go(frame),Math.max(500,cardDur(cur)*1000+1000))}
+$('cb2').onclick=()=>startIn('en');
+$('cb').onclick=()=>{if(cardKind==='end'){prime();goto(0);return}if(!started&&cur===0){startIn('ru');return}prime();started=true;$('cb').hidden=true;playCard(cur);timer=setTimeout(()=>go(frame),Math.max(500,cardDur(cur)*1000+1000))};
 addEventListener('message',e=>{if(!frame||e.source!==frame.contentWindow)return;const d=e.data||{};
  if(d.t==='phase'){const a=AUD[LANG]&&AUD[LANG].ch[cur]&&AUD[LANG].ch[cur][d.k];if(a)play(a)}
  if(d.t==='done'){if(cur<2)setTimeout(()=>goto(cur+1),1800);else setTimeout(()=>{cardKind='end';fillEnd();showCard();play(AUD[LANG]&&AUD[LANG].cards[3])},2200)}});

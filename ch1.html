@@ -468,7 +468,7 @@ addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProje
 
 <script>(function(){if(!new URLSearchParams(location.search).has('embed'))return;document.documentElement.classList.add('embed');
 let sent=false;const orig=nextPhase;nextPhase=function(){if(phase===(7)){if(!sent){sent=true;parent.postMessage({t:'done'},'*')}return}orig()};
-addEventListener('message',e=>{if(e.source!==parent)return;const d=e.data||{};if(d.t==='go'){sent=false;live=true;VO=d.vo||[];auto=true;try{ab.classList.add('on');camAuto=true;updCamBtn()}catch(_){}setPhase(0)}else if(d.t==='pause'){auto=false}});
+addEventListener('message',e=>{if(e.source!==parent)return;const d=e.data||{};if(d.t==='go'){sent=false;live=true;VO=d.vo||[];auto=true;try{ab.classList.add('on');camAuto=true;updCamBtn()}catch(_){}setPhase(0)}else if(d.t==='pause'){auto=false}else if(d.t==='lang'){if(LANG!==d.l)lb2.click()}});
 let VO=[],live=false;auto=false;const os=setPhase;setPhase=function(i){os(i);const k=i-(0),v=VO[k];if(v)DUR=Math.max(DUR,(v+.9)*CFG.speed);if(live)parent.postMessage({t:'phase',k},'*')};
 parent.postMessage({t:'ready'},'*')})()</script>
 </body></html>
