@@ -1,0 +1,527 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>body{margin:0}</style></head><body>
+<title>Анатомия картинки</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Russo+One&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+/* Layout: full-bleed WebGL stage — prompt + text encoder above a 64×64×4 latent that denoises into an image; mono HUD, two-row rail */
+:root{
+  --void:#0c1428; --ink:#e8ecff; --dim:#8a93b8; --query:#7fd4ff; --branch:#b48cff; --answer:#ffe7a3;
+  --display:"Russo One",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%;background:var(--void);color:var(--ink);overflow:hidden}
+canvas{display:block}
+[hidden]{display:none!important}
+.vig{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 55%,transparent 45%,rgba(4,7,16,.7) 100%)}
+.hud{position:fixed;pointer-events:none;font-family:var(--mono);font-size:11px;letter-spacing:.06em}
+.tl{top:calc(16px + env(safe-area-inset-top,0px));left:max(16px,env(safe-area-inset-left,0px));max-width:min(430px,58vw)}
+.tl h1{font-family:var(--display);font-weight:400;font-size:clamp(20px,3.2vw,32px);margin:0 0 8px;letter-spacing:.01em;text-transform:uppercase;line-height:1.05;text-wrap:balance}
+.tl .act{display:block;color:var(--answer);margin-bottom:6px;text-transform:uppercase;letter-spacing:.12em}
+.tl p{margin:0;color:var(--dim);line-height:1.6}
+.tr{top:calc(16px + env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right,0px));text-align:right;color:var(--dim);font-variant-numeric:tabular-nums;line-height:1.7;max-width:46vw}
+.tr span{color:var(--ink)}
+.tr em{font-style:normal}
+.tr .gold{color:var(--answer)}
+.tr .sep{display:block;height:6px}
+.tr .note{display:block;margin-top:8px;color:var(--dim);opacity:.75;max-width:240px;margin-left:auto;line-height:1.5;font-size:10px}
+.bar{display:inline-block;width:80px;height:4px;background:#1d2850;vertical-align:middle;margin-left:6px;border-radius:2px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--query)}
+.bar.g i{background:var(--answer)}
+.rail{position:fixed;left:0;right:0;bottom:0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:6px;font-family:var(--mono);font-size:11px}
+.rail .row{display:flex;gap:6px;flex-wrap:wrap}
+.rail button{pointer-events:auto;background:transparent;border:1px solid #2a3560;color:var(--dim);padding:7px 9px;border-radius:2px;font:inherit;cursor:pointer;transition:.3s}
+.rail button.on{color:var(--void);background:var(--ink);border-color:var(--ink)}
+.rail button.again{color:var(--void);background:var(--answer);border-color:var(--answer);box-shadow:0 0 24px rgba(255,231,163,.35)}
+.rail button:focus-visible{outline:2px solid var(--query);outline-offset:2px}
+.say{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);width:min(640px,calc(100vw - 32px));text-align:center;font-family:var(--mono);font-size:clamp(13px,1.6vw,16px);line-height:1.5;pointer-events:none;transition:opacity .5s;text-shadow:0 1px 12px rgba(4,7,16,.9)}
+.cfg{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:110px;width:min(270px,calc(100vw - 32px));max-height:calc(100% - 170px);overflow:auto;background:rgba(12,20,40,.86);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid #2a3560;border-radius:4px;padding:14px;font-family:var(--mono);font-size:11px;color:var(--dim);display:grid;gap:12px;z-index:5}
+.cfg h2{margin:0;font-family:var(--display);font-weight:400;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
+.cfg label{display:grid;grid-template-columns:1fr auto;gap:5px 8px;letter-spacing:.04em}
+.cfg output{color:var(--ink);font-variant-numeric:tabular-nums}
+.cfg input{grid-column:1/-1;width:100%;margin:0;accent-color:var(--query)}
+.cfg button{justify-self:start;background:transparent;border:1px solid #2a3560;color:var(--dim);padding:6px 9px;border-radius:2px;font:inherit;cursor:pointer}
+.cfg button:focus-visible,.cfg input:focus-visible{outline:2px solid var(--query);outline-offset:2px}
+@media (max-width:700px){.tr .note{display:none}}
+.pp{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);width:min(640px,calc(100vw - 32px));background:rgba(12,20,40,.82);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid #2a3560;border-radius:4px;padding:16px 18px;font-family:var(--mono);pointer-events:none;z-index:3}
+.pph{font-family:var(--display);text-transform:uppercase;font-size:12px;letter-spacing:.08em;color:var(--dim);margin-bottom:10px}
+.ppt{font-size:clamp(14px,1.9vw,19px);line-height:1.5;color:var(--ink);min-height:3em}
+.caret{display:inline-block;width:.55em;height:1.1em;background:var(--query);vertical-align:-.2em;margin-left:2px;animation:bl 1s steps(1) infinite}
+@keyframes bl{50%{opacity:0}}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;min-height:26px}
+.chip{border:1px solid #4a5590;color:var(--query);background:rgba(12,20,40,.9);padding:4px 8px;border-radius:2px;font-size:11px;opacity:0;will-change:transform}
+.ppn{margin-top:12px;color:var(--dim);font-size:11px;line-height:1.5}
+html.embed .rail{bottom:44px}html.embed .say,html.embed .cfg{margin-bottom:44px}html.embed .again{display:none!important}</style>
+
+<div class="vig"></div>
+<div class="hud tl">
+  <h1 data-t="title">Анатомия картинки</h1>
+  <span class="act" data-t="sub">Диффузионная модель</span>
+  <p data-t="desc"></p>
+</div>
+<div class="hud tr">
+  <em data-t="hPrompt"></em> <span id="h-prompt" class="gold">—</span><br>
+  <em data-t="hStage"></em> <span id="h-stage">—</span><br>
+  <em data-t="hStep"></em> <span id="h-step">0 / 30</span><br>
+  <em data-t="hNoise"></em> <span id="h-noise">1.00</span><span class="bar"><i id="h-bar"></i></span><br>
+  <span class="sep"></span>
+  <em data-t="hSeen"></em><br>
+  <em data-t="fLow"></em><span class="bar g"><i id="f-low"></i></span><br>
+  <em data-t="fMid"></em><span class="bar g"><i id="f-mid"></i></span><br>
+  <em data-t="fHigh"></em><span class="bar g"><i id="f-high"></i></span><br>
+  <span class="sep"></span>
+  <em data-t="hFix"></em> <span id="h-fix">—</span><span class="bar"><i id="h-fixb"></i></span><br>
+  <em data-t="hWord"></em> <span id="h-word" class="gold">—</span><br>
+  <em data-t="hGuide"></em> <span id="h-guide">7.0</span><br>
+  <em data-t="hSeed"></em> <span id="h-seed">—</span><br>
+  <em data-t="hLatent"></em> <span id="h-lat">64 × 64 × 4</span><br>
+  <em data-t="hOut"></em> <span id="h-out">—</span>
+  <span class="note" data-t="note"></span>
+</div>
+<div class="pp" id="pp" hidden><div class="pph" data-t="ppHead"></div><div class="ppt"><span id="pp-text"></span><i class="caret"></i></div><div class="chips"><span class="chip" data-to="h-lat" id="ch-size"></span><span class="chip" data-to="h-step" id="ch-steps"></span><span class="chip" data-to="h-guide" id="ch-guide"></span><span class="chip" data-to="h-seed" id="ch-seed"></span></div><div class="ppn" data-t="ppNote"></div></div>
+<div class="say" id="say"></div>
+<div class="cfg" id="cfg" hidden>
+  <h2 data-t="cfg">Настройки</h2>
+  <label for="c-br"><span data-t="c_br"></span> <output id="o-br"></output><input type="range" id="c-br" min="0.6" max="2.2" step="0.05"></label>
+  <label for="c-speed"><span data-t="c_speed"></span> <output id="o-speed"></output><input type="range" id="c-speed" min="0.25" max="2.5" step="0.05"></label>
+  <label for="c-dur"><span data-t="c_dur"></span> <output id="o-dur"></output><input type="range" id="c-dur" min="0.6" max="2" step="0.05"></label>
+  <label for="c-cam"><span data-t="c_cam"></span> <output id="o-cam"></output><input type="range" id="c-cam" min="0.3" max="2.5" step="0.05"></label>
+  <label for="c-star"><span data-t="c_star"></span> <output id="o-star"></output><input type="range" id="c-star" min="0.4" max="2" step="0.05"></label>
+  <label for="c-dens"><span data-t="c_dens"></span> <output id="o-dens"></output><input type="range" id="c-dens" min="0" max="1" step="0.05"></label>
+  <button type="button" id="c-reset" data-t="reset">Сбросить</button>
+</div>
+<nav class="rail" id="rail"></nav>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+// ================= content =================
+const TXT={
+ ru:{title:'Анатомия картинки',sub:'Диффузионная модель',
+  desc:'Как модель рисует по описанию: запрос → кодировщик → латент → шум → очистка → декодер. Вся картинка уточняется сразу, а не по кусочку.',
+  prompt:["маяк","на","скале","в","шторм","закатный","свет","масляная","живопись","широкий угол"],roles:['tower','','cliff','','sky','sky','sky','any','any','any'],
+  promptFull:'маяк на скале в шторм, закатный свет, масляная живопись, широкий угол',ppHead:'промпт',ppNote:'Свет и стиль — тоже слова. Размер, шаги и seed — настройки: они идут в обход текста.',
+  chips:['512×512','шагов: 30','guidance: 7','seed: '],table:'таблица эмбеддингов · ~49 000 строк',
+  ph:[["00","промпт","Человек пишет промпт. Свет и стиль — это тоже слова. Размер, шаги и seed — настройки, они идут в обход текста."],
+   ["01","токены","У каждого токена есть номер. Вектор не выбирается — он берётся из таблицы по номеру. Таблица выучена на парах «картинка + подпись»."],
+   ["02","кодировщик","Текстовый кодировщик пропускает токены через слои внимания: каждое слово становится набором чисел с учётом соседей."],
+   ["03","латент","Автокодировщик умеет сжимать картинку в 4 слоя 64×64 и разворачивать обратно. При генерации картинки нет — слои заполняются шумом."],
+   ["04","шум","Четыре слоя шума — стартовая точка. Seed решает, каким будет этот шум."],
+   ["05","очистка","На каждом шаге модель угадывает шум и вычитает его. Карточка справа — как она видит итог прямо сейчас."],
+   ["06","детали","Пока шума много, модель правит только крупное, когда мало — мелочь. На каждом шаге она предсказывает дважды, с промптом и без, и усиливает разницу ×7."],
+   ["07","декодер","Декодер — отдельная сеть. Он удваивает разрешение ступенями 64 → 128 → 256 → 512: каждая клетка латента (4 числа) становится блоком 8×8 пикселей."]],
+  stage:['ввод промпта','токенизация + таблица','кодировщик текста','автокодировщик (VAE)','стартовый шум','U-Net / трансформер','U-Net / трансформер','декодер VAE'],
+  hPrompt:'запрос',hStage:'работает',hStep:'шаг очистки',hNoise:'уровень шума',hSeen:'что уже различимо',fLow:'композиция',fMid:'формы',fHigh:'детали',
+  hWord:'слово → область',hGuide:'сила подсказки',hSeed:'seed',hLatent:'латент',hOut:'на выходе',
+  note:'Латент показан в цвете для наглядности. В реальной модели это 4 абстрактных канала, а картинкой он становится только после декодера.',
+  cfg:'Настройки',c_br:'яркость',c_speed:'скорость сцены',c_dur:'длина фаз',c_cam:'плавность камеры',c_star:'размер звёзд',c_dens:'лучи внимания',reset:'Сбросить',
+  auto:'▶ авто',camA:'◉ камера: авто',camF:'○ камера: свободно',gear:'⚙ настройки',seed:'🎲 другой seed',again:'↺ ещё раз',lang:'EN',
+  latent:'латент 64×64×4',image:'512×512 px',enc:'энкодер ↓',dec:'декодер ↑',guess:'как модель видит итог',vec:'векторы: числа на каждый токен',hFix:'размер правки',fix:['крупные пятна','формы','мелкие детали'],mag:'лупа: башня',gNo:'без промпта',gYes:'с промптом',gDiff:'разница × 7 → подсказка',inset:'1 клетка: 4 числа → 8×8 пикселей × 3 = 192 числа',stg:['латент 64','128','256','512 × 512'],ch:['яркость','тёпло/холод','цвет','края']},
+ en:{title:'Anatomy of an Image',sub:'Diffusion model',
+  desc:'How a model paints from a description: prompt → encoder → latent → noise → denoising → decoder. The whole picture sharpens at once, not piece by piece.',
+  prompt:["lighthouse","on","a","cliff","storm","sunset","light","oil","painting","wide angle"],roles:['tower','','','cliff','sky','sky','sky','any','any','any'],
+  promptFull:'lighthouse on a cliff in a storm, sunset light, oil painting, wide angle',ppHead:'prompt',ppNote:'Light and style are words too. Size, steps and seed are settings: they bypass the text.',
+  chips:['512×512','steps: 30','guidance: 7','seed: '],table:'embedding table · ~49,000 rows',
+  ph:[["00","prompt","A person writes a prompt. Light and style are just more words. Size, steps and seed are settings — they bypass the text."],
+   ["01","tokens","Every token has a number. The vector is not chosen — it is looked up in a table by that number. The table was learned from image + caption pairs."],
+   ["02","encoder","A text encoder runs the tokens through attention layers: each word becomes a set of numbers that knows its neighbours."],
+   ["03","latent","An autoencoder can squeeze a picture into 4 layers of 64×64 and unfold it back. During generation there is no picture — the layers are filled with noise."],
+   ["04","noise","Four layers of noise are the starting point. The seed decides what this noise looks like."],
+   ["05","denoising","Each step the model guesses the noise and removes it. The card on the right is how it sees the result right now."],
+   ["06","details","With lots of noise the model can only fix big things; with little noise, small ones. Each step it predicts twice — with and without the prompt — and amplifies the difference ×7."],
+   ["07","decoder","The decoder is a separate network. It doubles the resolution in stages 64 → 128 → 256 → 512: each latent cell (4 numbers) becomes an 8×8 block of pixels."]],
+  stage:['prompt input','tokenizer + table','text encoder','autoencoder (VAE)','starting noise','U-Net / transformer','U-Net / transformer','VAE decoder'],
+  hPrompt:'prompt',hStage:'working',hStep:'denoising step',hNoise:'noise level',hSeen:'already visible',fLow:'composition',fMid:'shapes',fHigh:'details',
+  hWord:'word → region',hGuide:'guidance scale',hSeed:'seed',hLatent:'latent',hOut:'output',
+  note:'The latent is shown in colour for clarity. In a real model it is 4 abstract channels and only becomes a picture after the decoder.',
+  cfg:'Settings',c_br:'brightness',c_speed:'scene speed',c_dur:'phase length',c_cam:'camera smoothness',c_star:'star size',c_dens:'attention rays',reset:'Reset',
+  auto:'▶ auto',camA:'◉ camera: auto',camF:'○ camera: free',gear:'⚙ settings',seed:'🎲 new seed',again:'↺ again',lang:'RU',
+  latent:'latent 64×64×4',image:'512×512 px',enc:'encoder ↓',dec:'decoder ↑',guess:'how the model sees the result',vec:'vectors: numbers per token',hFix:'size of fix',fix:['big blobs','shapes','fine details'],mag:'zoom: tower',gNo:'no prompt',gYes:'with prompt',gDiff:'difference × 7 → guidance',inset:'1 cell: 4 numbers → 8×8 pixels × 3 = 192 numbers',stg:['latent 64','128','256','512 × 512'],ch:['brightness','warm/cold','colour','edges']}
+};
+let LANG='ru';try{LANG=localStorage.getItem('anatlang')||((navigator.language||'').toLowerCase().startsWith('ru')?'ru':'en')}catch(e){}
+if(!TXT[LANG])LANG='ru';
+const L=()=>TXT[LANG];
+const DURS=[11,12,11,14,7,12,12,10];
+const STEPS=30,N=64,CELL=.5,W=N*CELL,FY=0,PY=FY+W/2+5;
+const C={q:0x7fd4ff,b:0xb48cff,a:0xffe7a3};
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const V=(x,y,z)=>new THREE.Vector3(x,y,z);
+const ease=x=>x<0?0:x>1?1:x*x*(3-2*x);
+const clamp=x=>x<0?0:x>1?1:x;
+const $=id=>document.getElementById(id);
+
+// ================= settings =================
+const CFG0={br:1.35,speed:1.25,dur:.85,cam:2.5,star:.9,dens:1},CFG={...CFG0};
+try{Object.assign(CFG,JSON.parse(localStorage.getItem('diffcfg')||'{}'))}catch(e){}
+const pct=v=>Math.round(v*100)+'%',x2=v=>v.toFixed(2)+'×';
+const fmt={br:pct,speed:x2,dur:x2,cam:x2,star:x2,dens:pct};
+
+// ================= renderer =================
+const R=new THREE.WebGLRenderer({antialias:true});
+R.setPixelRatio(Math.min(devicePixelRatio,2));R.setSize(innerWidth,innerHeight);R.setClearColor(0x0c1428);
+document.body.prepend(R.domElement);
+const S=new THREE.Scene();S.fog=new THREE.FogExp2(0x0c1428,.004);
+const cam=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,.1,900);cam.position.set(0,PY+1,20);
+const ctl=new THREE.OrbitControls(cam,R.domElement);ctl.enableDamping=true;ctl.target.set(0,PY,0);
+let camAuto=true,lastTouch=0;
+ctl.addEventListener('start',()=>{camAuto=false;lastTouch=performance.now();updCamBtn()});
+ctl.addEventListener('change',()=>{if(!camAuto)lastTouch=performance.now()});
+
+// ================= textures & helpers =================
+const gc=document.createElement('canvas');gc.width=gc.height=64;{const x=gc.getContext('2d');
+ const g=x.createRadialGradient(32,32,0,32,32,32);g.addColorStop(0,'#fff');g.addColorStop(.25,'rgba(255,255,255,.6)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,64,64)}
+const glow=new THREE.CanvasTexture(gc);
+const dc=document.createElement('canvas');dc.width=dc.height=32;{const x=dc.getContext('2d');
+ const g=x.createRadialGradient(16,16,0,16,16,16);g.addColorStop(0,'#fff');g.addColorStop(.55,'rgba(255,255,255,.9)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,32,32)}
+const dotTex=new THREE.CanvasTexture(dc);
+const fc=document.createElement('canvas');fc.width=fc.height=256;{const fx=fc.getContext('2d'),c=128;
+ let g=fx.createRadialGradient(c,c,0,c,c,128);g.addColorStop(0,'rgba(255,255,255,.55)');g.addColorStop(.1,'rgba(255,255,255,.16)');g.addColorStop(.45,'rgba(255,255,255,.03)');g.addColorStop(1,'rgba(255,255,255,0)');
+ fx.fillStyle=g;fx.fillRect(0,0,256,256);fx.globalCompositeOperation='lighter';fx.lineCap='round';
+ for(let k=0;k<18;k++){const a=k/18*6.283+Math.random()*.25,Ln=38+Math.random()*70,bend=(Math.random()-.5)*1.2;
+  const ex=c+Math.cos(a)*Ln,ey=c+Math.sin(a)*Ln,mx=c+Math.cos(a+bend)*Ln*.5,my=c+Math.sin(a+bend)*Ln*.5;
+  const lg=fx.createLinearGradient(c,c,ex,ey);lg.addColorStop(0,'rgba(255,255,255,.95)');lg.addColorStop(.35,'rgba(255,255,255,.35)');lg.addColorStop(1,'rgba(255,255,255,0)');
+  fx.strokeStyle=lg;fx.lineWidth=.7+Math.random()*.7;fx.beginPath();fx.moveTo(c,c);fx.quadraticCurveTo(mx,my,ex,ey);fx.stroke()}
+ g=fx.createRadialGradient(c,c,0,c,c,9);g.addColorStop(0,'#fff');g.addColorStop(.6,'rgba(255,255,255,.8)');g.addColorStop(1,'rgba(255,255,255,0)');
+ fx.fillStyle=g;fx.beginPath();fx.arc(c,c,9,0,6.283);fx.fill()}
+const flareTex=new THREE.CanvasTexture(fc);
+const lmat=(col,vc)=>new THREE.LineBasicMaterial({color:vc?0xffffff:col,vertexColors:!!vc,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
+const add=(tex,col,sz)=>{const m=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,color:col,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));m.scale.setScalar(sz);m.userData.sz=sz;m.material.opacity=0;S.add(m);return m};
+function label(text,col,px){px=px||44;const c=document.createElement('canvas'),x=c.getContext('2d');
+ const font=px+'px "JetBrains Mono", ui-monospace, monospace';x.font=font;const w=Math.ceil(x.measureText(text).width)+12;
+ c.width=w;c.height=Math.ceil(px*1.4);x.font=font;x.fillStyle=col;x.textBaseline='middle';x.fillText(text,6,c.height/2);
+ const t=new THREE.CanvasTexture(c);t.minFilter=THREE.LinearFilter;
+ const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthWrite:false,opacity:0}));
+ const h=px/44*.55;s.scale.set(h*w/c.height,h,1);S.add(s);return s}
+function kill(o){S.remove(o);if(o.material.map&&![glow,flareTex,dotTex].includes(o.material.map))o.material.map.dispose();o.material.dispose();if(o.geometry&&!o.isSprite)o.geometry.dispose()}
+function star(col,s){const f=add(flareTex,col,4.2*s),c=add(glow,0xffffff,1*s),h=add(glow,0xffc9a8,2.4*s);
+ return{f,c,h,set(p){f.position.copy(p);c.position.copy(p);h.position.copy(p)},
+  op(v){f.material.opacity=v;c.material.opacity=v;h.material.opacity=v*.12;[f,c,h].forEach(m=>m.scale.setScalar(m.userData.sz*CFG.star))},
+  kill(){[f,c,h].forEach(kill)}}}
+
+// deep background
+const shells=[];
+[[80,1800,.18,0x4a5590],[150,2200,.35,0x6a5aa8],[280,1600,.7,0x8a9ad8]].forEach(([r,n,sz,col])=>{
+ const g=new THREE.BufferGeometry(),p=new Float32Array(n*3);
+ for(let i=0;i<n;i++){const u=Math.random()*2-1,a=Math.random()*6.283,d=r*(.6+Math.random()*.4),s=Math.sqrt(1-u*u);
+  p[i*3]=Math.cos(a)*s*d;p[i*3+1]=u*d+8;p[i*3+2]=Math.sin(a)*s*d}
+ g.setAttribute('position',new THREE.BufferAttribute(p,3));
+ const pts=new THREE.Points(g,new THREE.PointsMaterial({size:sz,color:col,map:glow,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+ S.add(pts);shells.push(pts)});
+[[0x1e4a9a,-30,-20,-110,150,.35],[0x5a2a8a,60,20,-130,170,.3],[0x8a5a20,-20,60,-100,130,.22],[0x203a7a,-90,0,40,150,.25],[0x4a1a5a,80,-30,60,130,.25]].forEach(([c,x,y,z,s,o])=>{
+ const n=add(glow,c,s);n.position.set(x,y,z);n.material.opacity=o;n.material.fog=false});
+
+// =====================================================================
+// the target picture: a stormy lighthouse painted by code (seeded); returns its layout
+// =====================================================================
+let SEED=1+Math.floor(Math.random()*99999),GEO=null;
+function rng(seed){let s=seed%2147483647;if(s<=0)s+=2147483646;return()=>(s=s*16807%2147483647)/2147483647}
+function paint(ctx,Wd,Ht,seed){const r=rng(seed),u=v=>v*Wd,vv=v=>v*Ht;
+ const side=r()<.5?1:-1,hz=.6+r()*.05,lx=.5+side*(.12+r()*.12);
+ let g=ctx.createLinearGradient(0,0,0,vv(hz));g.addColorStop(0,'#0c1230');g.addColorStop(.6,'#2a2a5a');g.addColorStop(1,'#5a4a7a');ctx.fillStyle=g;ctx.fillRect(0,0,Wd,vv(hz));
+ for(let i=0;i<14;i++){const cx=u(r()),cy=vv(r()*hz*.8),rr=u(.12+r()*.22);g=ctx.createRadialGradient(cx,cy,0,cx,cy,rr);
+  const dark=r()<.6;g.addColorStop(0,dark?'rgba(8,10,26,.75)':'rgba(120,120,170,.45)');g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.fillRect(0,0,Wd,Ht)}
+ if(r()<.7){ctx.strokeStyle='rgba(230,235,255,.9)';ctx.lineWidth=Math.max(1,Wd/300);ctx.beginPath();let x=u(.5-side*(.2+r()*.2)),y=0;ctx.moveTo(x,y);
+  while(y<vv(hz*.8)){x+=u((r()-.5)*.06);y+=vv(.04+r()*.05);ctx.lineTo(x,y)}ctx.stroke()}
+ g=ctx.createLinearGradient(0,vv(hz),0,Ht);g.addColorStop(0,'#1a2a50');g.addColorStop(1,'#050b18');ctx.fillStyle=g;ctx.fillRect(0,vv(hz),Wd,Ht-vv(hz));
+ ctx.strokeStyle='rgba(140,170,220,.5)';ctx.lineWidth=Math.max(1,Wd/400);
+ for(let i=0;i<70;i++){const x=u(r()),y=vv(hz+.02+r()*(1-hz)),w=u(.03+r()*.06);ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo(x+w/2,y-vv(.012),x+w,y);ctx.stroke()}
+ const cTop=hz-.12-r()*.06;ctx.fillStyle='#070a14';ctx.beginPath();
+ const x0=side>0?1:0;ctx.moveTo(u(x0),Ht);ctx.lineTo(u(x0),vv(cTop-.02));ctx.lineTo(u(lx+side*.08),vv(cTop));ctx.lineTo(u(lx-side*.09),vv(cTop+.03));
+ ctx.lineTo(u(lx-side*.2),vv(hz+.08));ctx.lineTo(u(lx-side*.3),vv(1));ctx.closePath();ctx.fill();
+ ctx.strokeStyle='rgba(90,110,170,.6)';ctx.lineWidth=Math.max(1,Wd/250);ctx.beginPath();ctx.moveTo(u(lx+side*.08),vv(cTop));ctx.lineTo(u(lx-side*.09),vv(cTop+.03));ctx.lineTo(u(lx-side*.2),vv(hz+.08));ctx.stroke();
+ const tw=.035,th=.17,base=cTop+.005,top=base-th;
+ ctx.fillStyle='#e8ecf5';ctx.beginPath();ctx.moveTo(u(lx-tw),vv(base));ctx.lineTo(u(lx+tw),vv(base));ctx.lineTo(u(lx+tw*.7),vv(top));ctx.lineTo(u(lx-tw*.7),vv(top));ctx.closePath();ctx.fill();
+ ctx.fillStyle='#c94040';for(let k=0;k<3;k++){const y0=base-th*(.18+k*.3),y1=y0-th*.12,wa=tw*(1-.3*(base-y0)/th),wb=tw*(1-.3*(base-y1)/th);
+  ctx.beginPath();ctx.moveTo(u(lx-wa),vv(y0));ctx.lineTo(u(lx+wa),vv(y0));ctx.lineTo(u(lx+wb),vv(y1));ctx.lineTo(u(lx-wb),vv(y1));ctx.closePath();ctx.fill()}
+ ctx.fillStyle='#1a1d2c';ctx.fillRect(u(lx-tw*.95),vv(top-.012),u(tw*1.9),vv(.012));
+ const ly=top-.03,dir=-side,ang=(r()-.5)*.25;
+ g=ctx.createLinearGradient(u(lx),vv(ly),u(lx+dir*.6),vv(ly+ang));g.addColorStop(0,'rgba(255,231,163,.85)');g.addColorStop(1,'rgba(255,231,163,0)');
+ ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(u(lx),vv(ly));ctx.lineTo(u(lx+dir*.7),vv(ly+ang-.09));ctx.lineTo(u(lx+dir*.7),vv(ly+ang+.09));ctx.closePath();ctx.fill();
+ g=ctx.createRadialGradient(u(lx),vv(ly),0,u(lx),vv(ly),u(.07));g.addColorStop(0,'rgba(255,245,210,1)');g.addColorStop(1,'rgba(255,231,163,0)');ctx.fillStyle=g;ctx.fillRect(0,0,Wd,Ht);
+ ctx.fillStyle='#fff6d8';ctx.fillRect(u(lx-tw*.6),vv(ly-.015),u(tw*1.2),vv(.03));
+ ctx.fillStyle='#2a2d3c';ctx.beginPath();ctx.moveTo(u(lx-tw*.8),vv(ly-.015));ctx.lineTo(u(lx),vv(ly-.05));ctx.lineTo(u(lx+tw*.8),vv(ly-.015));ctx.closePath();ctx.fill();
+ ctx.strokeStyle='rgba(180,200,240,.18)';ctx.lineWidth=Math.max(1,Wd/600);for(let i=0;i<140;i++){const x=u(r()*1.2-.1),y=vv(r());ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-u(.02),y+vv(.05));ctx.stroke()}
+ return{side,hz,lx,ly,base,cTop}}
+
+// ================= target, blur pyramid, channels, regions =================
+const RADII=[0,1,2,3,5,8,12,18];let PYR=[],NOISE=null,NZ=null,CHN=null,NCH=null,REG={},hiTex=null;
+function boxBlur(src,r){if(r<=0)return src.slice();let a=src.slice(),b=new Float32Array(src.length);
+ for(let pass=0;pass<3;pass++){
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++)for(let c=0;c<3;c++){let s=0,n=0;for(let k=-r;k<=r;k++){const xx=Math.min(N-1,Math.max(0,x+k));s+=a[(y*N+xx)*3+c];n++}b[(y*N+x)*3+c]=s/n}
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++)for(let c=0;c<3;c++){let s=0,n=0;for(let k=-r;k<=r;k++){const yy=Math.min(N-1,Math.max(0,y+k));s+=b[(yy*N+x)*3+c];n++}a[(y*N+x)*3+c]=s/n}}
+ return a}
+function sampleBlur(r,i,c){if(r<=0)return PYR[0][i*3+c];let k=0;while(k<RADII.length-1&&RADII[k+1]<r)k++;if(k>=RADII.length-1)return PYR[k][i*3+c];
+ const t=(r-RADII[k])/(RADII[k+1]-RADII[k]);return PYR[k][i*3+c]*(1-t)+PYR[k+1][i*3+c]*t}
+function buildTarget(){const c=document.createElement('canvas');c.width=c.height=N;const x=c.getContext('2d');GEO=paint(x,N,N,SEED);
+ const d=x.getImageData(0,0,N,N).data,t=new Float32Array(N*N*3);for(let i=0;i<N*N;i++){t[i*3]=d[i*4]/255;t[i*3+1]=d[i*4+1]/255;t[i*3+2]=d[i*4+2]/255}
+ PYR=RADII.map(r=>boxBlur(t,Math.round(r/1.6)));
+ // 4 latent "channels" (illustrative): brightness, warm/cold, colour, edges
+ CHN=[new Float32Array(N*N),new Float32Array(N*N),new Float32Array(N*N),new Float32Array(N*N)];
+ for(let i=0;i<N*N;i++){const r=t[i*3],g=t[i*3+1],b=t[i*3+2],l=(r+g+b)/3,bl=(PYR[2][i*3]+PYR[2][i*3+1]+PYR[2][i*3+2])/3;
+  CHN[0][i]=clamp(l*1.6);CHN[1][i]=clamp(.5+(r-b)*1.6);CHN[2][i]=clamp(.5+(g-(r+b)/2)*3);CHN[3][i]=clamp(Math.abs(l-bl)*6)}
+ const nr=rng(SEED*7+3),gs=()=>{let s=0;for(let k=0;k<4;k++)s+=nr();return (s-2)*1.2};
+ NOISE=new Float32Array(N*N*3);NZ=new Float32Array(N*N);NCH=[0,1,2,3].map(()=>new Float32Array(N*N));
+ for(let i=0;i<N*N;i++){for(let k=0;k<3;k++)NOISE[i*3+k]=clamp(.45+gs()*.35);NZ[i]=gs();for(let k=0;k<4;k++)NCH[k][i]=clamp(.5+gs()*.4)}
+ // regions each prompt word pulls on
+ REG={tower:[],cliff:[],sky:[],any:[]};const G=GEO;
+ for(let y=0;y<N;y++)for(let x=0;x<N;x++){const i=y*N+x,u=x/N,v=y/N,l=(t[i*3]+t[i*3+1]+t[i*3+2])/3;REG.any.push(i);
+  if(Math.abs(u-G.lx)<.07&&v>G.ly-.08&&v<G.base+.01)REG.tower.push(i);
+  else if(v<G.hz-.03)REG.sky.push(i);
+  else if(v>G.cTop+.02&&l<.1&&(G.side>0?u>G.lx-.2:u<G.lx+.2))REG.cliff.push(i)}
+ const hc=document.createElement('canvas');hc.width=hc.height=512;paint(hc.getContext('2d'),512,512,SEED);
+ HC=hc;[32,64].forEach((r,k)=>{const c=document.createElement('canvas');c.width=c.height=r;const x=c.getContext('2d');x.drawImage(hc,0,0,r,r);if(STG[k].material.map)STG[k].material.map.dispose();const t=new THREE.CanvasTexture(c);t.magFilter=THREE.NearestFilter;t.minFilter=THREE.LinearFilter;t.generateMipmaps=false;STG[k].material.map=t;STG[k].material.needsUpdate=true});
+ {const x=gnc.getContext('2d'),im=x.createImageData(N,N);for(let i=0;i<N*N;i++){const l=(PYR[7][i*3]+PYR[7][i*3+1]+PYR[7][i*3+2])/3*.5+.22+(Math.random()-.5)*.12;im.data[i*4]=im.data[i*4+1]=im.data[i*4+2]=l*255;im.data[i*4+3]=255}x.putImageData(im,0,0);gnTex.needsUpdate=true}
+ {const tx=(GEO.lx-.5)*W,ty=FY+(.5-(GEO.ly+GEO.base)/2)*W;magLink.geometry.setFromPoints([V(tx,ty,.2),V(MAG.x+5.2,MAG.y,MAG.z)]);
+  CELLI=Math.floor((GEO.ly+.04)*N)*N+Math.floor(GEO.lx*N);const x=cellC.getContext('2d');x.imageSmoothingEnabled=true;x.drawImage(hc,GEO.lx*512-4,(GEO.ly+.04)*512-4,8,8,0,0,8,8);cellTex.needsUpdate=true}
+ if(hiTex)hiTex.dispose();hiTex=new THREE.CanvasTexture(hc);plane.material.map=hiTex;plane.material.needsUpdate=true;demo.material.map=hiTex;demo.material.needsUpdate=true}
+
+// ================= latent field (merged colour view) + 4 channel sheets =================
+const base=[];for(let y=0;y<N;y++)for(let x=0;x<N;x++)base.push([(x-(N-1)/2)*CELL,FY+((N-1)/2-y)*CELL]);
+function grid(size){const p=new Float32Array(N*N*3),c=new Float32Array(N*N*3),g=new THREE.BufferGeometry();
+ g.setAttribute('position',new THREE.BufferAttribute(p,3));g.setAttribute('color',new THREE.BufferAttribute(c,3));
+ const o=new THREE.Points(g,new THREE.PointsMaterial({size,map:dotTex,vertexColors:true,transparent:true,opacity:0,depthWrite:false}));S.add(o);return{o,p,c,g}}
+const F=grid(.74);
+const CHT=[[1,1,1],[1,.72,.5],[.55,.95,1],[.8,.6,1]];
+const CHS=[0,1,2,3].map(()=>grid(.55));
+const chLabs=[];
+const frame=new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([V(-W/2-.4,FY-W/2-.4,0),V(W/2+.4,FY-W/2-.4,0),V(W/2+.4,FY+W/2+.4,0),V(-W/2-.4,FY+W/2+.4,0)]),lmat(C.q));S.add(frame);
+const plane=new THREE.Mesh(new THREE.PlaneGeometry(W,W),new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));plane.position.set(0,FY,-.05);S.add(plane);
+const demo=new THREE.Mesh(new THREE.PlaneGeometry(W,W),new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));demo.position.set(0,FY,0);S.add(demo);
+// the "peeled" noise sheet that leaves the field at every step
+const PEEL=grid(.5);let peelT=9;
+// the preview card: model's current guess of the final picture (x0 estimate)
+const pc=document.createElement('canvas');pc.width=pc.height=N;const pcx=pc.getContext('2d'),pimg=pcx.createImageData(N,N);
+const pTex=new THREE.CanvasTexture(pc);pTex.magFilter=THREE.LinearFilter;
+const CARD=V(W/2+7.5,FY+6,2);
+const card=new THREE.Mesh(new THREE.PlaneGeometry(10,10),new THREE.MeshBasicMaterial({map:pTex,transparent:true,opacity:0,depthWrite:false}));card.position.copy(CARD);S.add(card);
+const cardFrame=new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([V(-5.2,-5.2,0),V(5.2,-5.2,0),V(5.2,5.2,0),V(-5.2,5.2,0)]),lmat(C.a));cardFrame.position.copy(CARD);S.add(cardFrame);
+const cardLink=new THREE.Line(new THREE.BufferGeometry().setFromPoints([V(W/2+.4,FY+6,0),V(CARD.x-5.2,CARD.y,CARD.z)]),lmat(C.a));S.add(cardLink);
+// ---- details: magnifier on the tower + guidance cards ----
+let HC=null,CELLI=0;
+const MAG=V(-W/2-7.5,FY+6,2),magc=document.createElement('canvas');magc.width=magc.height=256;const magx=magc.getContext('2d'),tiny=document.createElement('canvas'),tinyx=tiny.getContext('2d');
+const magTex=new THREE.CanvasTexture(magc);
+const mag=new THREE.Mesh(new THREE.PlaneGeometry(10,10),new THREE.MeshBasicMaterial({map:magTex,transparent:true,opacity:0,depthWrite:false}));mag.position.copy(MAG);S.add(mag);
+const magFrame=new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([V(-5.2,-5.2,0),V(5.2,-5.2,0),V(5.2,5.2,0),V(-5.2,5.2,0)]),lmat(C.q));magFrame.position.copy(MAG);S.add(magFrame);
+const magLink=new THREE.Line(new THREE.BufferGeometry().setFromPoints([V(0,0,0),V(1,0,0)]),lmat(C.q));S.add(magLink);
+function drawMag(sigma){if(!HC)return;const s=Math.max(3,Math.round(3+125*Math.pow(1-sigma,1.7)));tiny.width=tiny.height=s;
+ const cs=150,cx=GEO.lx*512-cs/2,cy=(GEO.ly+GEO.base)/2*512-cs/2;tinyx.drawImage(HC,cx,cy,cs,cs,0,0,s,s);
+ magx.imageSmoothingEnabled=true;magx.clearRect(0,0,256,256);magx.drawImage(tiny,0,0,256,256);
+ const n=Math.floor(900*sigma);for(let i=0;i<n;i++){magx.fillStyle='hsl('+(Math.random()*360|0)+',60%,'+(40+Math.random()*40|0)+'%)';magx.fillRect(Math.random()*256,Math.random()*256,7,7)}
+ magTex.needsUpdate=true}
+const gnc=document.createElement('canvas');gnc.width=gnc.height=N;const gnTex=new THREE.CanvasTexture(gnc);gnTex.magFilter=THREE.LinearFilter;
+const G1=V(CARD.x-2.8,FY-4.6,2),G2=V(CARD.x+2.8,FY-4.6,2);
+const gNo=new THREE.Mesh(new THREE.PlaneGeometry(4.6,4.6),new THREE.MeshBasicMaterial({map:gnTex,transparent:true,opacity:0,depthWrite:false}));gNo.position.copy(G1);S.add(gNo);
+const gYes=new THREE.Mesh(new THREE.PlaneGeometry(4.6,4.6),new THREE.MeshBasicMaterial({map:pTex,transparent:true,opacity:0,depthWrite:false}));gYes.position.copy(G2);S.add(gYes);
+// ---- decoder ladder: latent 64 → 128 → 256 → 512 ----
+const STG=[0,1].map(()=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));S.add(m);return m});
+const LAD={x:[-33,-17,0,22],s:[10,12,15,20]};
+const cellC=document.createElement('canvas');cellC.width=cellC.height=8;const cellTex=new THREE.CanvasTexture(cellC);cellTex.magFilter=THREE.NearestFilter;cellTex.minFilter=THREE.NearestFilter;cellTex.generateMipmaps=false;
+const cellBlock=new THREE.Mesh(new THREE.PlaneGeometry(4.4,4.4),new THREE.MeshBasicMaterial({map:cellTex,transparent:true,opacity:0,depthWrite:false}));cellBlock.position.set(-2,FY+15,0);cellBlock.scale.setScalar(1.6);S.add(cellBlock);
+const cellGrid=(()=>{const p=[];for(let k=0;k<=8;k++){const a=-2.2+k*.55;p.push(a,-2.2,0,a,2.2,0,-2.2,a,0,2.2,a,0)}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));const l=new THREE.LineSegments(g,lmat(0x0c1428));l.position.copy(cellBlock.position).add(V(0,0,.01));l.scale.setScalar(1.6);l.material.blending=THREE.NormalBlending;S.add(l);return l})();
+const cellBars=(()=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(24),3));g.setAttribute('color',new THREE.BufferAttribute(new Float32Array(24),3));const l=new THREE.LineSegments(g,lmat(0,true));l.position.set(-14,FY+15,0);l.scale.setScalar(1.6);S.add(l);return l})();
+const cellArrow=new THREE.Line(new THREE.BufferGeometry().setFromPoints([V(-10.6,FY+15,0),V(-6.6,FY+15,0),V(-7.3,FY+15.5,0),V(-6.6,FY+15,0),V(-7.3,FY+14.5,0)]),lmat(C.a));S.add(cellArrow);
+
+// ================= prompt tokens, text encoder, output vectors =================
+let toks=[],encFrames=[],encArcs=null,vecs=null,labs={};
+const EL=4,EY0=PY+2.2,EDY=1.7,VY=EY0+EL*EDY+.8;
+const NRW=36,rowY=r=>PY-5.2+r*.36,TX0=xs=>xs[0]-6;let table=null,tframe=null,rowHi=null;
+function buildPrompt(){toks.forEach(t=>{t.st.kill();kill(t.lb);kill(t.beam);kill(t.il);kill(t.ray);kill(t.pack)});[table,tframe,rowHi].forEach(o=>o&&kill(o));toks=[];encFrames.forEach(kill);encFrames=[];if(encArcs)kill(encArcs);if(vecs)kill(vecs);
+ Object.values(labs).forEach(kill);labs={};
+ const w=L().prompt,n=w.length,sp=3.4,xs=w.map((_,i)=>(i-(n-1)/2)*sp);
+ w.forEach((word,i)=>{const p=V(xs[i],PY,0),st=star(C.q,1);st.set(p);const lb=label(word,'#d6ecff');lb.position.copy(p).add(V(0,-1.25,0));
+  let hh=7;for(const ch of word)hh=(hh*31+ch.charCodeAt(0))%49000;const tid=hh+120,il=label('#'+tid,'#8a93b8',30);il.position.copy(p).add(V(0,-1.95,0));
+  const beam=new THREE.Line(new THREE.BufferGeometry().setFromPoints([V(0,0,0),V(0,1,0)]),lmat(C.q));beam.position.copy(p);beam.scale.y=.001;S.add(beam);const row=tid%NRW,ray=new THREE.Line(new THREE.BufferGeometry().setFromPoints([p.clone(),V(TX0(xs)+1.7,rowY(row),0)]),lmat(C.a));S.add(ray);
+  const pk=[],pc=[];for(let k=0;k<7;k++){const len=.25+Math.random()*1.1,y=k*.16,cl=Math.random()<.5?[.5,.85,1]:[1,.72,.5];pk.push(-len/2,y,0,len/2,y,0);pc.push(...cl,...cl)}
+  const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.Float32BufferAttribute(pk,3));pg.setAttribute('color',new THREE.Float32BufferAttribute(pc,3));const pack=new THREE.LineSegments(pg,lmat(0,true));S.add(pack);
+  toks.push({p,st,lb,beam,x:xs[i],il,ray,pack,row})});
+ {const tx=TX0(xs),tp=[],tc=[];for(let r=0;r<NRW;r++){const y=rowY(r);for(let k=0;k<8;k++){const a=tx-1.6+k*.42,v=.25+Math.random()*.6;tp.push(a,y,0,a+.3,y,0);tc.push(.5*v,.6*v,.9*v,.5*v,.6*v,.9*v)}}
+  const tg=new THREE.BufferGeometry();tg.setAttribute('position',new THREE.Float32BufferAttribute(tp,3));tg.setAttribute('color',new THREE.Float32BufferAttribute(tc,3));
+  table=new THREE.LineSegments(tg,lmat(0,true));S.add(table);
+  tframe=new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([V(tx-1.9,rowY(0)-.3,0),V(tx+1.9,rowY(0)-.3,0),V(tx+1.9,rowY(NRW-1)+.3,0),V(tx-1.9,rowY(NRW-1)+.3,0)]),lmat(C.q));S.add(tframe);
+  rowHi=new THREE.Line(new THREE.BufferGeometry().setFromPoints([V(tx-1.8,0,0),V(tx+1.8,0,0)]),lmat(C.a));S.add(rowHi);
+  labs.table=label(L().table,'#8a93b8',30);labs.table.position.set(tx,rowY(NRW-1)+1,0)}
+ const wd=(n-1)*sp+3;
+ for(let l=0;l<EL;l++){const f=new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([V(-wd/2,0,-2),V(wd/2,0,-2),V(wd/2,0,2),V(-wd/2,0,2)]),lmat(C.q));f.position.y=EY0+l*EDY;S.add(f);encFrames.push(f)}
+ // attention arcs between word columns, one bundle per encoder layer (vertex colours = weight)
+ const pos=[],col=[];let rs=SEED%9973+5;const rr=()=>(rs=(rs*16807)%2147483647)/2147483647;
+ for(let l=0;l<EL;l++){const y=EY0+l*EDY;for(let i=0;i<n;i++)for(let j=0;j<n;j++){if(i===j)continue;const wgt=rr();if(wgt<.45)continue;
+  const z=(l%2?1:-1)*.6,A=V(xs[j],y,z),B=V(xs[i],y,z),M=A.clone().lerp(B,.5);M.y+=.35+.12*Math.abs(i-j);
+  const p=new THREE.QuadraticBezierCurve3(A,M,B).getPoints(10),c=new THREE.Color([0x7fd4ff,0xb48cff,0xffb38a,0x8ff0e0][l]),k=wgt;
+  for(let s=0;s<10;s++){pos.push(p[s].x,p[s].y,p[s].z,p[s+1].x,p[s+1].y,p[s+1].z);col.push(c.r*k,c.g*k,c.b*k,c.r*k,c.g*k,c.b*k)}}}
+ let g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+ encArcs=new THREE.LineSegments(g,lmat(0,true));encArcs.userData.per=pos.length/3/EL;S.add(encArcs);
+ // output vectors: 14 numbers per token drawn as signed bars
+ const vp=[],vc=[];for(let i=0;i<n;i++)for(let k=0;k<14;k++){const v=(rr()*2-1),len=Math.abs(v)*1.5+.08,y=VY+k*.34,cl=v>0?[.5,.85,1]:[1,.72,.5];
+  vp.push(xs[i]-len/2,y,0,xs[i]+len/2,y,0);vc.push(...cl,...cl)}
+ g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(vp,3));g.setAttribute('color',new THREE.Float32BufferAttribute(vc,3));
+ vecs=new THREE.LineSegments(g,lmat(0,true));S.add(vecs);
+ labs.vec=label(L().vec,'#8a93b8',34);labs.vec.position.set(0,VY+14*.34+.8,0);
+ labs.lat=label(L().latent,'#8a93b8',36);labs.img=label(L().image,'#ffe7a3',36);
+ labs.enc=label(L().enc,'#cbbcff',40);labs.dec=label(L().dec,'#ffe7a3',40);labs.guess=label(L().guess,'#ffe7a3',34);labs.guess.position.copy(CARD).add(V(0,6.2,0));
+ labs.mag=label(L().mag,'#7fd4ff',34);labs.mag.position.copy(MAG).add(V(0,6.2,0));
+ labs.gNo=label(L().gNo,'#8a93b8',28);labs.gNo.position.copy(G1).add(V(0,-3,0));labs.gYes=label(L().gYes,'#ffe7a3',28);labs.gYes.position.copy(G2).add(V(0,-3,0));
+ labs.gDiff=label(L().gDiff,'#ffe7a3',30);labs.gDiff.position.copy(G1).lerp(G2,.5).add(V(0,3,0));
+ labs.inset=label(L().inset,'#ffe7a3',48);labs.inset.position.set(-8,FY+10.3,0);
+ L().stg.forEach((t,k)=>{labs['st'+k]=label(t,k===3?'#ffe7a3':'#8a93b8',34)});
+ [0,1,2].forEach(k=>{labs['x2'+k]=label('×2 →','#ffe7a3',40);labs['x2'+k].position.set((LAD.x[k]+LAD.s[k]/2+LAD.x[k+1]-LAD.s[k+1]/2)/2,FY,0)});
+ L().ch.forEach((t,k)=>{labs['ch'+k]=label((k+1)+' · '+t,'#'+new THREE.Color(...CHT[k]).getHexString(),32)})}
+// rays: active word → its region of the latent
+const RN=16,rp=new Float32Array(RN*6),rg=new THREE.BufferGeometry();rg.setAttribute('position',new THREE.BufferAttribute(rp,3));
+const rays=new THREE.LineSegments(rg,lmat(0xffe7a3));S.add(rays);let rayFlash=0,activeWord=-1;
+function aimRays(k){const roles=L().roles,cands=roles.map((r,i)=>r?i:-1).filter(i=>i>=0);activeWord=cands[k%cands.length];
+ const reg=REG[roles[activeWord]]&&REG[roles[activeWord]].length?REG[roles[activeWord]]:REG.any,src=V(toks[activeWord].x,VY,0);
+ for(let j=0;j<RN;j++){const i=reg[Math.floor(Math.random()*reg.length)];rp.set([src.x+(Math.random()-.5)*.8,src.y,src.z,base[i][0],base[i][1],F.p[i*3+2]],j*6)}
+ rg.attributes.position.needsUpdate=true;rayFlash=1}
+
+// ================= state, rail =================
+let phase=0,pt=0,auto=true,DUR=8,T=0,step=0,lastStep=-1,finished=false;
+const rail=$('rail'),say=$('say');
+const r1=document.createElement('div'),r2=document.createElement('div');r1.className=r2.className='row';rail.append(r1,r2);
+function setPhase(i){if(i<6){finished=false;agb.hidden=true}
+ lastStep=-1;phase=i;pt=0;DUR=DURS[i+1]*CFG.dur;$('pp').hidden=i!==-1;
+ [...r1.children].forEach((b,k)=>b.classList.toggle('on',k===i+1));
+ say.style.opacity=0;setTimeout(()=>{say.textContent=L().ph[phase+1][2];say.style.opacity=1},250)}
+function nextPhase(){if(phase===6){if(!finished){finished=true;agb.hidden=false;auto=false;ab.classList.remove('on')}return}setPhase(phase+1)}
+for(let i=-1;i<7;i++){const b=document.createElement('button');b.onclick=()=>{auto=false;ab.classList.remove('on');setPhase(i)};r1.appendChild(b)}
+const ab=document.createElement('button');ab.className='on';ab.onclick=()=>{auto=!auto;ab.classList.toggle('on',auto)};r2.appendChild(ab);
+const cb=document.createElement('button');function updCamBtn(){cb.textContent=camAuto?L().camA:L().camF;cb.classList.toggle('on',camAuto)}
+cb.onclick=()=>{camAuto=!camAuto;lastTouch=performance.now();updCamBtn()};r2.appendChild(cb);
+const gb=document.createElement('button');gb.setAttribute('aria-controls','cfg');gb.onclick=()=>{const c=$('cfg');c.hidden=!c.hidden;gb.classList.toggle('on',!c.hidden)};r2.appendChild(gb);
+const lb2=document.createElement('button');lb2.onclick=()=>{LANG=LANG==='ru'?'en':'ru';try{localStorage.setItem('anatlang',LANG)}catch(e){}applyLang();buildPrompt();setPhase(phase)};r2.appendChild(lb2);
+const sb=document.createElement('button');sb.onclick=()=>{SEED=1+Math.floor(Math.random()*99999);buildTarget();buildPrompt();auto=true;ab.classList.add('on');setPhase(3)};r2.appendChild(sb);
+const agb=document.createElement('button');agb.className='again';agb.hidden=true;agb.onclick=()=>{auto=true;ab.classList.add('on');setPhase(-1)};r2.appendChild(agb);
+function applyLang(){document.documentElement.lang=LANG;document.querySelectorAll('[data-t]').forEach(el=>el.textContent=L()[el.dataset.t]);
+ [...r1.children].forEach((b,i)=>b.textContent=L().ph[i][0]+' '+L().ph[i][1]);
+ ab.textContent=L().auto;updCamBtn();gb.textContent=L().gear;lb2.textContent=L().lang;sb.textContent=L().seed;agb.textContent=L().again;
+ $('h-prompt').textContent=L().promptFull;placeSay()}
+function placeSay(){const h=rail.getBoundingClientRect().height;say.style.bottom=(h+14)+'px';$('cfg').style.bottom=(h+12)+'px'}
+addEventListener('resize',placeSay);
+function applyCfg(){R.domElement.style.filter='brightness('+CFG.br+')';
+ for(const k in CFG){const i=$('c-'+k);if(i){i.value=CFG[k];$('o-'+k).textContent=fmt[k](CFG[k])}}
+ try{localStorage.setItem('diffcfg',JSON.stringify(CFG))}catch(e){}}
+for(const k in CFG0){const i=$('c-'+k);i.addEventListener('input',()=>{CFG[k]=+i.value;applyCfg()})}
+$('c-reset').onclick=()=>{Object.assign(CFG,CFG0);applyCfg()};
+
+// ================= frame loop =================
+let last=performance.now();
+function tick(now){
+ const dt=Math.min((now-last)/1000,.05)*CFG.speed;last=now;T+=dt;pt+=dt;
+ if(auto&&pt>DUR)nextPhase();
+ if(!camAuto&&now-lastTouch>8000){camAuto=true;updCamBtn()}
+ const u=Math.min(1,pt/DUR);
+
+ // ---- prompt & encoder ----
+ const encP=phase<=0?0:phase===1?ease(u/.8):1;           // how far tokens have passed through the encoder
+ const nT=toks.length;toks.forEach((t,i)=>{const v=phase<0?0:phase===0?ease(u*5-i*.25):1;t.st.op(v*(phase<=1?1:.6));t.lb.material.opacity=v*.9;t.il.material.opacity=v*(phase===0?.9:phase===1?.5*(1-encP):0);
+  const t0=.3+i*.05,ra=phase===0?ease((u-t0)/.04)*(1-ease((u-t0-.1)/.05)):0;t.ray.material.opacity=ra*.7;
+  if(ra>.5){rowHi.position.y=rowY(t.row);rowHi.material.opacity=ra}
+  const m=phase===0?ease((u-t0-.04)/.1):phase===1?1:0,from=V(TX0(toks.map(q=>q.x)),rowY(t.row),0),to=V(t.x,PY+.9,0);t.pack.position.lerpVectors(from,to,m);t.pack.material.opacity=phase===0?(m>0?.95:0):phase===1?.95*(1-ease(encP*2)):0;
+  t.beam.scale.y=Math.max(.001,encP*(VY-PY-.3));t.beam.material.opacity=encP*.5});
+ const showEnc=phase===1?1:phase>1?.25:0;
+ {const ta=phase===0?ease(u/.2-.6):phase===1?.4*(1-encP):0;table.material.opacity=ta;tframe.material.opacity=ta*.5;labs.table.material.opacity=ta;if(phase!==0)rowHi.material.opacity=0;else rowHi.material.opacity*=.97}
+ encFrames.forEach((f,l)=>{const d=encP*EL-l;f.material.opacity=(phase===1?(d>0&&d<1?.9:d>=1?.35:.12):showEnc*.4)*(phase<=0?0:1)});
+ {const lf=encP*EL;encArcs.material.opacity=phase===1?.9:phase>1?.12:0;encArcs.geometry.setDrawRange(0,Math.floor(Math.min(EL,lf)*encArcs.userData.per/2)*2)}
+ const vecA=phase===1?ease((u-.75)/.2):phase>1?.85:0;vecs.material.opacity=vecA;labs.vec.material.opacity=phase===1?vecA:phase===2?.0:0;
+
+ // ---- latent demo (phase 2): image → 4 channels → image → gone → channels fill with noise ----
+ let demoA=0,chA=0,chSpread=0,chNoise=0,chFromImg=0;
+ if(phase===2){demoA=ease(u/.12)*(1-ease((u-.18)/.1));                       // picture appears, then dissolves
+  const a=ease((u-.18)/.14),b=ease((u-.42)/.1),c=ease((u-.55)/.08);           // encode, decode back, picture fades
+  if(u>.42&&u<.62)demoA=Math.max(demoA,b*(1-c));
+  chA=a*(1-b)+ease((u-.66)/.1);chSpread=chA;chFromImg=u<.66?1:1-ease((u-.66)/.14);chNoise=1-chFromImg;
+  labs.enc.material.opacity=a*(1-b);labs.dec.material.opacity=b*(1-c);}
+ else{labs.enc.material.opacity=0;labs.dec.material.opacity=0}
+ if(phase===3){chA=1-ease((u-.15)/.5);chSpread=1-ease(u/.6);chNoise=1}
+ demo.material.opacity=demoA;
+ labs.enc.position.set(-W/2-1,FY+W/2+1.5,0);labs.dec.position.set(-W/2-1,FY+W/2+1.5,0);
+ for(let k=0;k<4;k++){const s=CHS[k],sc=1-.53*chSpread,ox=(k%2?1:-1)*W*.255*chSpread,oy=FY+(k<2?1:-1)*W*.255*chSpread,z=k*.02,tint=CHT[k];
+  for(let i=0;i<N*N;i++){const q=i*3,v=CHN[k][i]*chFromImg+NCH[k][i]*chNoise;s.p[q]=base[i][0]*sc+ox;s.p[q+1]=(base[i][1]-FY)*sc+oy;s.p[q+2]=z;s.c[q]=tint[0]*v;s.c[q+1]=tint[1]*v;s.c[q+2]=tint[2]*v}
+  s.g.attributes.position.needsUpdate=true;s.g.attributes.color.needsUpdate=true;s.o.material.opacity=chA*.85;
+  const lb=labs['ch'+k];lb.position.set(ox,oy-W/2*sc-.7,0);lb.material.opacity=chA*(phase===2?1:.6)}
+
+ // ---- denoising: steps 0..15 in phase 4, 15..30 in phase 5 ----
+ let kf=0;if(phase===4)kf=u*15;else if(phase===5)kf=15+u*15;else if(phase===6)kf=STEPS;
+ const k=Math.floor(kf),fr=kf-k,kk=Math.min(STEPS,k+ease(fr*3));
+ if((phase===4||phase===5)&&k!==lastStep&&k<STEPS){lastStep=k;peelT=0;aimRays(k)}
+ step=Math.min(STEPS,kk);
+ const sigma=phase<4?1:Math.pow(1-step/STEPS,1.35),blur=18*Math.pow(sigma,1.1);
+ const fin=phase<3?0:phase===3?ease((u-.2)/.6):1;
+ const dec=phase===6?ease((u-.8)/.16):0,lad=phase===6?ease(u/.14):0,fsc=1-lad*(1-LAD.s[0]/W),fxo=LAD.x[0]*lad;
+ const roles=L().roles,hiReg=activeWord>=0&&(phase===4||phase===5)?REG[roles[activeWord]]:null,hiSet=hiReg?new Set(hiReg):null;
+ for(let i=0;i<N*N;i++){const q=i*3;
+  const tr=sampleBlur(blur,i,0),tg=sampleBlur(blur,i,1),tb=sampleBlur(blur,i,2);
+  let r=NOISE[q]*sigma+tr*(1-sigma),g=NOISE[q+1]*sigma+tg*(1-sigma),b=NOISE[q+2]*sigma+tb*(1-sigma);
+  if(hiSet&&hiSet.has(i)){const h=rayFlash*.35*CFG.dens;r+=h;g+=h*.9;b+=h*.6}
+  F.c[q]=Math.min(1,r*1.45+.05);F.c[q+1]=Math.min(1,g*1.45+.05);F.c[q+2]=Math.min(1,b*1.45+.06);
+  const lum=(tr+tg+tb)/3;F.p[q]=base[i][0]*fsc+fxo;F.p[q+1]=FY+(base[i][1]-FY)*fsc;F.p[q+2]=(NZ[i]*sigma*3.2+lum*1.6*(1-sigma))*fsc}
+ F.g.attributes.position.needsUpdate=true;F.g.attributes.color.needsUpdate=true;
+ F.o.material.opacity=fin*(1-dec);F.o.material.size=.74*(1-lad*.25);
+ frame.material.opacity=phase>=2?.3*(1-dec):0;frame.scale.setScalar(fsc);frame.position.x=fxo;
+ {const lp=V(-W/2+3.4,FY-W/2-1.4,0);labs.lat.position.copy(lp);labs.lat.material.opacity=phase>=2&&phase<6?.8:0;
+  const fb=V(-W/2*1.7+3.4,FY-W/2*1.7-1.4,0);labs.img.position.copy(fb);labs.img.material.opacity=dec*.95}
+ // decoder ladder
+ {const ap=k=>phase===6?ease((u-.14-k*.14)/.1):0;
+  STG.forEach((m,k)=>{const a=ap(k);m.position.set(LAD.x[k+1],FY,0);m.scale.setScalar(LAD.s[k+1]);m.material.opacity=a*(1-dec)});
+  const a3=ap(2),sz=LAD.s[3]+(W*1.7-LAD.s[3])*dec;plane.position.set(LAD.x[3]*(1-dec),FY,-.05);plane.scale.setScalar(sz/W);plane.material.opacity=a3;
+  [0,1,2,3].forEach(k=>{const lb=labs['st'+k],x=k===3?LAD.x[3]*(1-dec):LAD.x[k],s=k===3?sz:LAD.s[k];lb.position.set(x,FY-s/2-1,0);lb.material.opacity=(k===0?lad:ap(k-1))*(k===3?1:1-dec)*(dec>.5&&k===3?0:.95)});
+  [0,1,2].forEach(k=>labs['x2'+k].material.opacity=ap(k)*(1-dec));
+  const ia=phase===6?ease((u-.56)/.06)*(1-ease((u-.76)/.06)):0;cellBlock.material.opacity=ia;cellGrid.material.opacity=ia*.8;cellArrow.material.opacity=ia;labs.inset.material.opacity=ia;cellBars.material.opacity=ia;
+  if(ia>0){const p=cellBars.geometry.attributes.position.array,c=cellBars.geometry.attributes.color.array;for(let k=0;k<4;k++){const v=CHN[k][CELLI]||.5,len=.6+v*2.4,y=1.2-k*.8;p.set([-len/2,y,0,len/2,y,0],k*6);c.set([...CHT[k],...CHT[k]],k*6)}cellBars.geometry.attributes.position.needsUpdate=true;cellBars.geometry.attributes.color.needsUpdate=true}}
+ // magnifier + guidance (details)
+ {const ma=phase===4?ease(u/.15)*.85:phase===5?1:phase===6?1-ease(u/.12):0;if(ma>0)drawMag(sigma);mag.material.opacity=ma;magFrame.material.opacity=ma*.6;magLink.material.opacity=ma*.35;labs.mag.material.opacity=ma*.95;
+  const ga=phase===4||phase===5?.55+rayFlash*.45:0;gNo.material.opacity=ga*.9;gYes.material.opacity=ga;labs.gNo.material.opacity=ga;labs.gYes.material.opacity=ga;labs.gDiff.material.opacity=ga;}
+ // peeled noise: a ghost of the removed noise drifts off the field after each step
+ peelT+=dt*1.4;{const a=Math.max(0,1-peelT),amt=phase===4||phase===5?(1-step/STEPS):0;
+  for(let i=0;i<N*N;i++){const q=i*3;PEEL.p[q]=base[i][0];PEEL.p[q+1]=base[i][1];PEEL.p[q+2]=F.p[q+2]+peelT*7;PEEL.c[q]=NOISE[q]*.8;PEEL.c[q+1]=NOISE[q+1]*.8;PEEL.c[q+2]=NOISE[q+2]*.9}
+  PEEL.g.attributes.position.needsUpdate=true;PEEL.g.attributes.color.needsUpdate=true;PEEL.o.material.opacity=a*.45*amt}
+ // preview card: the model's current guess of the clean picture (blurry early, sharp late)
+ const showCard=phase===4||phase===5?1:phase===6?1-ease(u/.12):0;
+ if(showCard>0){const gb=22*Math.pow(sigma,.8);for(let i=0;i<N*N;i++){pimg.data[i*4]=sampleBlur(gb,i,0)*255*1.3;pimg.data[i*4+1]=sampleBlur(gb,i,1)*255*1.3;pimg.data[i*4+2]=sampleBlur(gb,i,2)*255*1.3;pimg.data[i*4+3]=255}
+  pcx.putImageData(pimg,0,0);pTex.needsUpdate=true}
+ card.material.opacity=showCard;cardFrame.material.opacity=showCard*.6;cardLink.material.opacity=showCard*.35;labs.guess.material.opacity=showCard*.95;
+ rayFlash=Math.max(0,rayFlash-dt*1.4);rays.material.opacity=(phase===4||phase===5)?(.08+rayFlash*.6)*CFG.dens:0;
+
+ // ---- camera ----
+ if(camAuto){const a=T*.1*(reduce?.4:1),far=innerWidth<700?1.5:1;let P,Tg;
+  if(phase===-1){P=V(Math.sin(a)*6,PY+1.5,30*far);Tg=V(-3,PY,0)}
+  else if(phase===0){P=V(-3.5+Math.sin(a)*4,PY+1.5,30*far);Tg=V(-3.5,PY+1,0)}
+  else if(phase===1){P=V(Math.sin(a*1.4)*10,PY+7,32*far);Tg=V(0,PY+5,0)}
+  else if(phase===2){P=V(Math.sin(a)*5,FY+1,46*far);Tg=V(0,FY,0)}
+  else if(phase===3){P=V(20*Math.sin(a+.6),7,44*far);Tg=V(0,FY+2,0)}
+  else if(phase===4){P=V(6+12*Math.sin(a*1.2+.9),FY+10,64*far);Tg=V(5,FY+8,0)}
+  else if(phase===5){P=V(5+Math.sin(a)*5,FY+11,64*far);Tg=V(5,FY+8,0)}
+  else{P=V(Math.sin(a)*4,FY+7,100*far);Tg=V(-3+3*dec,FY+6,0)}
+  const f=1-Math.exp(-dt*(reduce?.5:.9)*CFG.cam);cam.position.lerp(P,f);ctl.target.lerp(Tg,f)}
+ shells.forEach((s,i)=>s.rotation.y=T*.003*(i+1));
+
+ // ---- prompt panel (phase -1) ----
+ if(phase===-1)drivePanel(u);
+ // ---- HUD ----
+ $('h-stage').textContent=L().stage[phase+1];
+ $('h-step').textContent=Math.floor(step)+' / '+STEPS;
+ $('h-noise').textContent=sigma.toFixed(2);$('h-bar').style.width=(sigma*100).toFixed(1)+'%';
+ const seen=1-sigma;$('f-low').style.width=(clamp(seen*2.4)*100)+'%';$('f-mid').style.width=(clamp(seen*1.8-.35)*100)+'%';$('f-high').style.width=(clamp(seen*1.6-.6)*100)+'%';
+ $('h-word').textContent=(phase===4||phase===5)&&activeWord>=0?L().prompt[activeWord]:'—';
+ $('h-seed').textContent=SEED;
+ $('h-out').textContent=phase===6&&dec>.5?L().image:'—';
+ {const f=phase<4?null:sigma;$('h-fix').textContent=f==null?'—':L().fix[f>.55?0:f>.2?1:2];$('h-fixb').style.width=f==null?'0':(f*100).toFixed(1)+'%'}
+ ctl.update();R.render(S,cam);requestAnimationFrame(tick)}
+
+function drivePanel(u){const full=L().promptFull,n=Math.floor(clamp(u/.45)*full.length);$('pp-text').textContent=full.slice(0,n);
+ const ids=['ch-size','ch-steps','ch-guide','ch-seed'];const fly=ease((u-.72)/.18);
+ $('pp').style.opacity=1-ease((u-.86)/.1);
+ ids.forEach((id,k)=>{const c=$(id);c.textContent=L().chips[k]+(k===3?SEED:'');const ap=ease((u-.48-k*.04)/.06);
+  if(fly<=0){c.style.transform='none';c._b=c.getBoundingClientRect()}
+  else if(c._b){const t=$(c.dataset.to).getBoundingClientRect(),b=c._b;c.style.transform='translate('+((t.left+t.width/2-b.left-b.width/2)*fly)+'px,'+((t.top+t.height/2-b.top-b.height/2)*fly)+'px)'}
+  c.style.opacity=ap*(1-ease((fly-.85)/.15));$(c.dataset.to).style.color=fly>.9?'var(--answer)':''})}
+function start(){applyLang();applyCfg();buildTarget();buildPrompt();setPhase(-1);requestAnimationFrame(tick)}
+let started=false;const go=()=>{if(!started){started=true;start()}};
+(document.fonts&&document.fonts.load?document.fonts.load('44px "JetBrains Mono"'):Promise.resolve()).then(go,go);setTimeout(go,1500);
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)});
+</script>
+
+<script>(function(){if(!new URLSearchParams(location.search).has('embed'))return;document.documentElement.classList.add('embed');
+let sent=false;const orig=nextPhase;nextPhase=function(){if(phase===(6)){if(!sent){sent=true;parent.postMessage({t:'done'},'*')}return}orig()};
+addEventListener('message',e=>{if(e.source!==parent)return;const d=e.data||{};if(d.t==='go'){sent=false;live=true;VO=d.vo||[];auto=true;try{ab.classList.add('on');camAuto=true;updCamBtn()}catch(_){}setPhase(-1)}else if(d.t==='pause'){auto=false}});
+let VO=[],live=false;auto=false;const os=setPhase;setPhase=function(i){os(i);const k=i-(-1),v=VO[k];if(v)DUR=Math.max(DUR,(v+.9)*CFG.speed);if(live)parent.postMessage({t:'phase',k},'*')};
+parent.postMessage({t:'ready'},'*')})()</script>
+</body></html>

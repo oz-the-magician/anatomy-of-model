@@ -1,0 +1,75 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="icon" href="data:,"></head><body>
+<title>Анатомия модели</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Russo+One&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+/* Layout: one story in three chapters — each chapter is its own full-screen scene (iframe); chapter bar at the bottom, title cards between chapters */
+:root{--void:#0c1428;--ink:#e8ecff;--dim:#8a93b8;--query:#7fd4ff;--answer:#ffe7a3;--display:"Russo One",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace;color-scheme:dark}
+html,body{height:100%;margin:0;background:var(--void);color:var(--ink);overflow:hidden}
+[hidden]{display:none!important}
+iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:var(--void);transition:opacity .9s}
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:10;display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:0 max(16px,env(safe-area-inset-left,0px)) calc(12px + env(safe-area-inset-bottom,0px));font-family:var(--mono);font-size:11px}
+.bar .lab{color:var(--dim);letter-spacing:.12em;text-transform:uppercase;margin-right:4px}
+.bar button{background:rgba(12,20,40,.6);border:1px solid #3a4880;color:var(--dim);padding:6px 10px;border-radius:2px;font:inherit;cursor:pointer;transition:.3s}
+.bar button.on{color:var(--void);background:var(--answer);border-color:var(--answer)}
+.bar button:focus-visible{outline:2px solid var(--query);outline-offset:2px}
+.card{position:fixed;inset:0;z-index:20;display:grid;place-content:center;text-align:center;gap:16px;padding:24px;background:radial-gradient(ellipse at 50% 50%,rgba(30,40,90,.55),rgba(8,12,26,.97) 70%),var(--void);transition:opacity .8s;pointer-events:none}
+.card .k{font-family:var(--mono);font-size:12px;letter-spacing:.3em;color:var(--answer);text-transform:uppercase}
+.card h2{font-family:var(--display);font-weight:400;margin:0;font-size:clamp(34px,7vw,84px);letter-spacing:.02em;text-transform:uppercase;line-height:1;text-shadow:0 0 40px rgba(127,212,255,.35)}
+.card p{font-family:var(--mono);color:var(--dim);margin:0 auto;font-size:clamp(14px,1.8vw,19px);max-width:640px;line-height:1.5}
+.card button{pointer-events:auto;justify-self:center;margin-top:10px;font-family:var(--mono);font-size:13px;color:var(--void);background:var(--answer);border:0;padding:10px 18px;border-radius:2px;cursor:pointer;box-shadow:0 0 24px rgba(255,231,163,.35)}
+.card .stars{position:absolute;inset:0;z-index:-1;background-image:radial-gradient(1px 1px at 20% 30%,#fff8,transparent),radial-gradient(1px 1px at 70% 60%,#fff6,transparent),radial-gradient(1.5px 1.5px at 40% 80%,#cfe8ff88,transparent),radial-gradient(1px 1px at 85% 20%,#fff7,transparent),radial-gradient(1px 1px at 10% 70%,#fff5,transparent),radial-gradient(1.5px 1.5px at 55% 15%,#ffe7a388,transparent);animation:zoom 3.2s ease-in forwards}
+@keyframes zoom{from{transform:scale(1);opacity:.4}to{transform:scale(2.4);opacity:1}}
+@media (prefers-reduced-motion:reduce){.card .stars{animation:none}}
+</style>
+
+<div class="bar" id="bar"><span class="lab" id="lab"></span></div>
+<div class="card" id="card"><div class="stars" id="stars"></div><span class="k" id="ck"></span><h2 id="ch"></h2><p id="cp"></p><button id="cb" hidden></button></div>
+
+<script src="voice.js"></script>
+<script>
+const T={
+ ru:{lab:'глава',ch:['Обучение','Мысль','Картинка'],k:['часть 1','часть 2','часть 3','финал'],
+  sub:['как модель стала собой','заглянем внутрь одного ответа','а если попросить картинку? Работает другая машина'],
+  end:'Слова, мысли, картинки — всё это числа, выученные из примеров.',endH:'Анатомия модели',again:'↺ ещё раз',start:'▶ начать',vOn:'🔊 голос',vOff:'🔇 голос'},
+ en:{lab:'chapter',ch:['Training','Thought','Image'],k:['part 1','part 2','part 3','finale'],
+  sub:['how the model became itself','a look inside a single answer','what if you ask for a picture? A different machine is at work'],
+  end:'Words, thoughts, pictures — all of it is numbers learned from examples.',endH:'Anatomy of a Model',again:'↺ again',start:'▶ start',vOn:'🔊 voice',vOff:'🔇 voice'}};
+const $=id=>document.getElementById(id);
+let LANG='ru';const readLang=()=>{try{LANG=localStorage.getItem('anatlang')||((navigator.language||'').toLowerCase().startsWith('ru')?'ru':'en')}catch(e){}if(!T[LANG])LANG='ru'};readLang();
+const L=()=>T[LANG];
+// ---- voice: all clips live here (one unlock on the start click) ----
+const VC=window.VOICE||{};const AUD={};for(const l in VC){AUD[l]={cards:VC[l].cards.map(c=>c?mkA(c[0]):null),ch:VC[l].ch.map(a=>a.map(c=>c?mkA(c[0]):null))}}
+function mkA(u){const a=new Audio(u);a.preload='auto';return a}
+let voiceOn=true,CUR=null;try{voiceOn=localStorage.getItem('storyvoice')!=='0'}catch(e){}
+function stopV(){if(CUR){CUR.pause();CUR=null}}
+function play(a){stopV();if(!voiceOn||!a)return;a.currentTime=0;CUR=a;a.play().catch(()=>{})}
+const cardDur=i=>{const c=VC[LANG]&&VC[LANG].cards[i];return c?c[1]:0};
+const chDurs=i=>((VC[LANG]&&VC[LANG].ch[i])||[]).map(c=>c?c[1]:0);
+function prime(){for(const l in AUD){[...AUD[l].cards,...AUD[l].ch.flat()].forEach(a=>{if(!a)return;a.muted=true;a.play().then(()=>{a.pause();a.currentTime=0;a.muted=false}).catch(()=>{a.muted=false})})}}
+const btns=[0,1,2].map(i=>{const b=document.createElement('button');b.onclick=()=>goto(i);$('bar').appendChild(b);return b});
+function texts(){document.documentElement.lang=LANG;$('lab').textContent=L().lab;btns.forEach((b,i)=>b.textContent=(i+1)+' · '+L().ch[i]);vtxt();
+ if(cur>=0&&cardShown){if(cardKind==='end')fillEnd();else fillCard(cur)}}
+const vb=document.createElement('button');vb.onclick=()=>{voiceOn=!voiceOn;try{localStorage.setItem('storyvoice',voiceOn?'1':'0')}catch(e){}if(!voiceOn)stopV();vtxt()};
+function vtxt(){vb.textContent=voiceOn?L().vOn:L().vOff;vb.classList.toggle('on',voiceOn)}$('bar').appendChild(vb);
+addEventListener('storage',e=>{if(e.key==='anatlang'){readLang();texts()}});
+
+let cur=-1,frame=null,cardShown=false,cardKind='',timer=0,started=false;
+function fillCard(i){$('ck').textContent=L().k[i];$('ch').textContent=L().ch[i];$('cp').textContent=L().sub[i];$('cb').hidden=started;$('cb').textContent=L().start}
+function fillEnd(){$('ck').textContent=L().k[3];$('ch').textContent=L().endH;$('cp').textContent=L().end;$('cb').hidden=false;$('cb').textContent=L().again}
+function showCard(){cardShown=true;const c=$('card');c.hidden=false;const s=$('stars');s.style.animation='none';void s.offsetWidth;s.style.animation='';requestAnimationFrame(()=>c.style.opacity=1)}
+function hideCard(){cardShown=false;const c=$('card');c.style.opacity=0;setTimeout(()=>{if(!cardShown)c.hidden=true},800)}
+function goto(i){clearTimeout(timer);cur=i;cardKind='ch';btns.forEach((b,k)=>b.classList.toggle('on',k===i));fillCard(i);showCard();
+ if(frame)frame.contentWindow&&frame.contentWindow.postMessage({t:'pause'},'*');
+ const old=frame,f=document.createElement('iframe');f.src='ch'+(i+1)+'.html?embed=1';f.title=L().ch[i];f.style.opacity=0;f.allow='autoplay';document.body.insertBefore(f,$('bar'));frame=f;
+ f.onload=()=>{if(old)old.remove();if(started){playCard(i);timer=setTimeout(()=>go(f),Math.max(2600,cardDur(i)*1000+1000))}}}
+function playCard(i){const a=AUD[LANG]&&AUD[LANG].cards[i];stopV();if(a)setTimeout(()=>play(a),350)}
+function go(f){if(f!==frame)return;f.style.opacity=1;f.contentWindow.postMessage({t:'go',vo:chDurs(cur)},'*');hideCard();try{f.focus()}catch(e){}}
+$('cb').onclick=()=>{prime();if(cardKind==='end'){goto(0);return}started=true;$('cb').hidden=true;playCard(cur);timer=setTimeout(()=>go(frame),Math.max(500,cardDur(cur)*1000+1000))};
+addEventListener('message',e=>{if(!frame||e.source!==frame.contentWindow)return;const d=e.data||{};
+ if(d.t==='phase'){const a=AUD[LANG]&&AUD[LANG].ch[cur]&&AUD[LANG].ch[cur][d.k];if(a)play(a)}
+ if(d.t==='done'){if(cur<2)setTimeout(()=>goto(cur+1),1800);else setTimeout(()=>{cardKind='end';fillEnd();showCard();play(AUD[LANG]&&AUD[LANG].cards[3])},2200)}});
+texts();goto(0);
+</script>
+
+</body></html>

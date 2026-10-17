@@ -1,0 +1,474 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>body{margin:0}</style></head><body>
+<title>Анатомия обучения</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Russo+One&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+/* Layout: full-bleed WebGL stage — corpus cloud streams into a layered network that learns (pretrain → SFT → RL) and freezes; mono HUD, two-row rail */
+:root{
+  --void:#0c1428; --ink:#e8ecff; --dim:#8a93b8; --query:#7fd4ff; --branch:#b48cff; --answer:#ffe7a3; --grad:#ff8a7a;
+  --display:"Russo One",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%;background:var(--void);color:var(--ink);overflow:hidden;margin:0}
+canvas{display:block}
+[hidden]{display:none!important}
+.vig{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 55%,transparent 45%,rgba(4,7,16,.7) 100%)}
+.hud{position:fixed;pointer-events:none;font-family:var(--mono);font-size:11px;letter-spacing:.06em}
+.tl{top:calc(16px + env(safe-area-inset-top,0px));left:max(16px,env(safe-area-inset-left,0px));max-width:min(430px,58vw)}
+.tl h1{font-family:var(--display);font-weight:400;font-size:clamp(20px,3.2vw,32px);margin:0 0 8px;letter-spacing:.01em;text-transform:uppercase;line-height:1.05;text-wrap:balance}
+.tl .act{display:block;color:var(--answer);margin-bottom:6px;text-transform:uppercase;letter-spacing:.12em}
+.tl p{margin:0;color:var(--dim);line-height:1.6}
+.tr{top:calc(16px + env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right,0px));text-align:right;color:var(--dim);font-variant-numeric:tabular-nums;line-height:1.7;max-width:46vw}
+.tr span{color:var(--ink)}
+.tr em{font-style:normal}
+.tr .gold{color:var(--answer)}
+.tr .red{color:var(--grad)}
+.tr .sep{display:block;height:6px}
+.tr .note{display:block;margin-top:8px;color:var(--dim);opacity:.75;max-width:240px;margin-left:auto;line-height:1.5;font-size:10px}
+.tr canvas{display:block;margin:4px 0 2px auto;width:140px;height:36px}
+.bar{display:inline-block;width:80px;height:4px;background:#1d2850;vertical-align:middle;margin-left:6px;border-radius:2px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--query)}
+.bar.g i{background:var(--answer)}
+.bar.r i{background:var(--grad)}
+.rail{position:fixed;left:0;right:0;bottom:0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:6px;font-family:var(--mono);font-size:11px}
+.rail .row{display:flex;gap:6px;flex-wrap:wrap}
+.rail button{pointer-events:auto;background:transparent;border:1px solid #2a3560;color:var(--dim);padding:7px 9px;border-radius:2px;font:inherit;cursor:pointer;transition:.3s}
+.rail button.on{color:var(--void);background:var(--ink);border-color:var(--ink)}
+.rail button.again{color:var(--void);background:var(--answer);border-color:var(--answer);box-shadow:0 0 24px rgba(255,231,163,.35)}
+.rail button:focus-visible{outline:2px solid var(--query);outline-offset:2px}
+.say{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);width:min(640px,calc(100vw - 32px));text-align:center;font-family:var(--mono);font-size:clamp(13px,1.6vw,16px);line-height:1.5;pointer-events:none;transition:opacity .5s;text-shadow:0 1px 12px rgba(4,7,16,.9)}
+.cfg{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:110px;width:min(270px,calc(100vw - 32px));max-height:calc(100% - 170px);overflow:auto;background:rgba(12,20,40,.86);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid #2a3560;border-radius:4px;padding:14px;font-family:var(--mono);font-size:11px;color:var(--dim);display:grid;gap:12px;z-index:5}
+.cfg h2{margin:0;font-family:var(--display);font-weight:400;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
+.cfg label{display:grid;grid-template-columns:1fr auto;gap:5px 8px;letter-spacing:.04em}
+.cfg output{color:var(--ink);font-variant-numeric:tabular-nums}
+.cfg input{grid-column:1/-1;width:100%;margin:0;accent-color:var(--query)}
+.cfg button{justify-self:start;background:transparent;border:1px solid #2a3560;color:var(--dim);padding:6px 9px;border-radius:2px;font:inherit;cursor:pointer}
+.cfg button:focus-visible,.cfg input:focus-visible{outline:2px solid var(--query);outline-offset:2px}
+@media (max-width:700px){.tr .note,.tr canvas{display:none}}
+html.embed .rail{bottom:44px}html.embed .say,html.embed .cfg{margin-bottom:44px}html.embed .again{display:none!important}</style>
+
+<div class="vig"></div>
+<div class="hud tl">
+  <h1 data-t="title">Анатомия обучения</h1>
+  <span class="act" data-t="sub"></span>
+  <p data-t="desc"></p>
+</div>
+<div class="hud tr">
+  <em data-t="hStage"></em> <span id="h-stage" class="gold">—</span><br>
+  <em data-t="hData"></em> <span id="h-data">—</span><br>
+  <em data-t="hStep"></em> <span id="h-step">0</span><br>
+  <em data-t="hLoss"></em> <span id="h-loss" class="red">—</span><span class="bar r"><i id="h-bar"></i></span><br>
+  <canvas id="lossplot" width="280" height="72"></canvas>
+  <em data-t="hSig"></em> <span id="h-sig">—</span><br>
+  <span class="sep"></span>
+  <em data-t="hSkills"></em><br>
+  <em data-t="s0"></em><span class="bar g"><i id="s0"></i></span><br>
+  <em data-t="s1"></em><span class="bar g"><i id="s1"></i></span><br>
+  <em data-t="s2"></em><span class="bar g"><i id="s2"></i></span><br>
+  <em data-t="s3"></em><span class="bar g"><i id="s3"></i></span><br>
+  <em data-t="s4"></em><span class="bar g"><i id="s4"></i></span><br>
+  <span class="sep"></span>
+  <em data-t="hW"></em> <span id="h-w">—</span><br>
+  <em data-t="hCtx"></em> <span id="h-ctx">—</span><span class="bar"><i id="h-ctxb"></i></span>
+  <span class="note" data-t="note"></span>
+</div>
+<div class="say" id="say"></div>
+<div class="cfg" id="cfg" hidden>
+  <h2 data-t="cfg">Настройки</h2>
+  <label for="c-br"><span data-t="c_br"></span> <output id="o-br"></output><input type="range" id="c-br" min="0.6" max="2.2" step="0.05"></label>
+  <label for="c-speed"><span data-t="c_speed"></span> <output id="o-speed"></output><input type="range" id="c-speed" min="0.25" max="2.5" step="0.05"></label>
+  <label for="c-dur"><span data-t="c_dur"></span> <output id="o-dur"></output><input type="range" id="c-dur" min="0.6" max="2" step="0.05"></label>
+  <label for="c-cam"><span data-t="c_cam"></span> <output id="o-cam"></output><input type="range" id="c-cam" min="0.3" max="2.5" step="0.05"></label>
+  <label for="c-star"><span data-t="c_star"></span> <output id="o-star"></output><input type="range" id="c-star" min="0.4" max="2" step="0.05"></label>
+  <label for="c-dens"><span data-t="c_dens"></span> <output id="o-dens"></output><input type="range" id="c-dens" min="0.2" max="1.6" step="0.05"></label>
+  <button type="button" id="c-reset" data-t="reset">Сбросить</button>
+</div>
+<nav class="rail" id="rail"></nav>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+// ================= content =================
+const TXT={
+ ru:{title:'Анатомия обучения',sub:'Как обучается языковая модель',
+  desc:'От случайных весов до ассистента: корпус → предсказание следующего токена → образцы → подкрепление → заморозка.',
+  ph:[["01","корпус","Сначала — корпус: книги, код, веб-страницы, статьи. Триллионы токенов текста."],
+   ["02","веса","Модель начинается со случайных весов. Связи хаотичны, на выходе — бессмыслица."],
+   ["03","предсказание","Задача одна: угадать следующий токен. Ошибка бежит назад по слоям и чуть сдвигает каждый вес."],
+   ["04","смыслы","Триллионы таких шагов — и в весах складывается пространство смыслов: язык, код, математика, факты."],
+   ["05","образцы","Дообучение на образцах «вопрос → хороший ответ». Модель учится отвечать, а не продолжать текст."],
+   ["06","награда","Модель пишет несколько ответов, их оценивают люди, принципы конституции и тесты. Сильные ветви усиливаются."],
+   ["07","заморозка","Обучение закончено, веса замораживаются. Больше они не меняются."],
+   ["08","разговор","Дальше — разговор. Модель читает контекст и пишет ответ по одному токену; каждый новый токен добавляется в контекст. Веса не меняются — память о разговоре живёт только в нём."]],
+  stage:['сбор корпуса','инициализация','предобучение','предобучение','дообучение (SFT)','подкрепление (RL)','выпуск','использование (инференс)'],
+  data:['триллионы токенов','—','текст → следующий токен','текст → следующий токен','пары «вопрос → ответ»','ответы + оценки','—','контекст'],
+  sig:['—','—','ошибка предсказания','ошибка предсказания','отличие от образца','награда','нет: веса заморожены','нет: обучения нет'],
+  wState:['—','случайные','упорядочиваются','упорядочены','подстраиваются','подстраиваются','заморожены','заморожены'],
+  hStage:'этап',hData:'данные',hStep:'шаг обучения',hLoss:'ошибка (loss)',hSig:'сигнал',hSkills:'чему уже научилась',hW:'веса',
+  s0:'грамматика',s1:'факты',s2:'рассуждение',s3:'формат ассистента',s4:'ценности',
+  note:'Схема упрощена: сеть из 96 узлов вместо миллиардов весов. Точные рецепты обучения компании публикуют не полностью.',
+  cfg:'Настройки',c_br:'яркость',c_speed:'скорость сцены',c_dur:'длина фаз',c_cam:'плавность камеры',c_star:'размер звёзд',c_dens:'яркость связей',reset:'Сбросить',
+  auto:'▶ авто',camA:'◉ камера: авто',camF:'○ камера: свободно',gear:'⚙ настройки',again:'↺ ещё раз',lang:'EN',
+  src:['книги','код','веб','статьи'],clusters:['код','языки','математика','факты'],
+  frags:['def main():','Война и мир','E = mc²','<div class=…>','SELECT * FROM','Once upon a time','∫ f(x) dx','Привет, как дела?','import numpy','Глава 1','x² + y² = r²','Википедия','if (err) return','Теорема Пифагора','console.log()','abstract: we propose','for i in range(10):','Dear Sir,','рецепт борща','2 + 2 = 4'],
+  sent:[['кошка сидит на','ковре',['столе','луне','бегу','и']],['2 + 2 =','4',['5','22','кот','=']],['столица Франции —','Париж',['Лондон','вода','синий','—']],['def add(a, b): return a +','b',['a','c','0','(']],['вода кипит при 100','°C',['км','кошек','лет','%']]],
+  out:'выход: ',outs:['на на кот кот ковре и и сидит','кошка сидела на ковре и','кошка сидела на ковре и мурлыкала.'],
+  outCont:'Как сварить рис? Как сварить гречку? Как сварить…',outAns:'Промыть рис, залить водой 1:2, варить 15 минут.',
+  cards:[['❓ Как сварить рис?','✓ Промыть, залить водой 1:2, варить 15 минут.'],['❓ Переведи «cat»','✓ «Кошка».'],['❓ Напиши функцию суммы','✓ def add(a, b): return a + b']],
+  judges:['👤 люди сравнивают пары ответов','📜 конституция: ИИ-оценщик по принципам','✓ тесты: код запускается, ответ сходится'],
+  frozen:'❄ веса заморожены',hCtx:'контекст',ctxTitle:'окно контекста',ctxB:['инструкции','вопрос','файл','ответ'],ans:['Промыть','рис,','залить','водой','1:2,','варить','15','минут.'],wipe:'чат закрыт — контекст стёрт, веса те же',input:'вход',output:'выход'},
+ en:{title:'Anatomy of Training',sub:'How a language model learns',
+  desc:'From random weights to an assistant: corpus → next-token prediction → examples → reinforcement → freeze.',
+  ph:[["01","corpus","First, the corpus: books, code, web pages, papers. Trillions of tokens of text."],
+   ["02","weights","The model starts with random weights. Connections are chaotic, the output is gibberish."],
+   ["03","prediction","One task: guess the next token. The error runs back through the layers and nudges every weight."],
+   ["04","meaning","Trillions of such steps — and a space of meaning forms in the weights: language, code, maths, facts."],
+   ["05","examples","Fine-tuning on “question → good answer” examples. The model learns to answer, not just continue text."],
+   ["06","reward","The model writes several answers; people, constitution principles and tests score them. Strong branches get reinforced."],
+   ["07","freeze","Training is over and the weights are frozen. They no longer change."],
+   ["08","conversation","Then comes the conversation. The model reads the context and writes the answer one token at a time; each new token is added to the context. The weights stay the same — memory of the chat lives only there."]],
+  stage:['collecting corpus','initialisation','pre-training','pre-training','fine-tuning (SFT)','reinforcement (RL)','release','use (inference)'],
+  data:['trillions of tokens','—','text → next token','text → next token','“question → answer” pairs','answers + scores','—','context'],
+  sig:['—','—','prediction error','prediction error','gap to the example','reward','none: weights frozen','none: no training'],
+  wState:['—','random','organising','organised','adjusting','adjusting','frozen','frozen'],
+  hStage:'stage',hData:'data',hStep:'training step',hLoss:'error (loss)',hSig:'signal',hSkills:'already learned',hW:'weights',
+  s0:'grammar',s1:'facts',s2:'reasoning',s3:'assistant format',s4:'values',
+  note:'Simplified: a 96-node network instead of billions of weights. Companies do not publish their exact training recipes in full.',
+  cfg:'Settings',c_br:'brightness',c_speed:'scene speed',c_dur:'phase length',c_cam:'camera smoothness',c_star:'star size',c_dens:'link brightness',reset:'Reset',
+  auto:'▶ auto',camA:'◉ camera: auto',camF:'○ camera: free',gear:'⚙ settings',again:'↺ again',lang:'RU',
+  src:['books','code','web','papers'],clusters:['code','languages','maths','facts'],
+  frags:['def main():','War and Peace','E = mc²','<div class=…>','SELECT * FROM','Once upon a time','∫ f(x) dx','Hi, how are you?','import numpy','Chapter 1','x² + y² = r²','Wikipedia','if (err) return','Pythagorean theorem','console.log()','abstract: we propose','for i in range(10):','Dear Sir,','pancake recipe','2 + 2 = 4'],
+  sent:[['the cat sat on the','mat',['moon','run','and','table']],['2 + 2 =','4',['5','22','cat','=']],['the capital of France is','Paris',['London','water','blue','is']],['def add(a, b): return a +','b',['a','c','0','(']],['water boils at 100','°C',['km','cats','years','%']]],
+  out:'output: ',outs:['the the cat cat mat on on sat','the cat sat on the mat and','the cat sat on the mat and purred.'],
+  outCont:'How to cook rice? How to cook pasta? How to cook…',outAns:'Rinse the rice, add water 1:2, simmer for 15 minutes.',
+  cards:[['❓ How do I cook rice?','✓ Rinse, add water 1:2, simmer 15 minutes.'],['❓ Translate “кошка”','✓ “Cat”.'],['❓ Write a sum function','✓ def add(a, b): return a + b']],
+  judges:['👤 people compare pairs of answers','📜 constitution: an AI judge applies principles','✓ tests: the code runs, the answer checks out'],
+  frozen:'❄ weights frozen',hCtx:'context',ctxTitle:'context window',ctxB:['instructions','question','file','answer'],ans:['Rinse','the','rice,','add','water','1:2,','simmer','15 min.'],wipe:'chat closed — context erased, weights unchanged',input:'input',output:'output'}
+};
+let LANG='ru';try{LANG=localStorage.getItem('anatlang')||((navigator.language||'').toLowerCase().startsWith('ru')?'ru':'en')}catch(e){}
+if(!TXT[LANG])LANG='ru';
+const L=()=>TXT[LANG];
+const DURS=[9,9,17,10,13,16,8,18];
+const C={q:0x7fd4ff,b:0xb48cff,a:0xffe7a3,g:0xff8a7a,ice:0xcfeeff};
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const V=(x,y,z)=>new THREE.Vector3(x,y,z);
+const ease=x=>x<0?0:x>1?1:x*x*(3-2*x);
+const clamp=x=>x<0?0:x>1?1:x;
+const $=id=>document.getElementById(id);
+const rgb=h=>[(h>>16&255)/255,(h>>8&255)/255,(h&255)/255];
+
+// ================= settings =================
+const CFG0={br:1.35,speed:1.25,dur:.85,cam:2.5,star:.9,dens:1},CFG={...CFG0};
+try{Object.assign(CFG,JSON.parse(localStorage.getItem('traincfg')||'{}'))}catch(e){}
+const pct=v=>Math.round(v*100)+'%',x2=v=>v.toFixed(2)+'×';
+const fmt={br:pct,speed:x2,dur:x2,cam:x2,star:x2,dens:pct};
+
+// ================= renderer =================
+const R=new THREE.WebGLRenderer({antialias:true});
+R.setPixelRatio(Math.min(devicePixelRatio,2));R.setSize(innerWidth,innerHeight);R.setClearColor(0x0c1428);
+document.body.prepend(R.domElement);
+const S=new THREE.Scene();S.fog=new THREE.FogExp2(0x0c1428,.004);
+const cam=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,.1,900);cam.position.set(0,10,80);
+const ctl=new THREE.OrbitControls(cam,R.domElement);ctl.enableDamping=true;ctl.target.set(0,0,0);
+let camAuto=true,lastTouch=0;
+ctl.addEventListener('start',()=>{camAuto=false;lastTouch=performance.now();updCamBtn()});
+ctl.addEventListener('change',()=>{if(!camAuto)lastTouch=performance.now()});
+
+// ================= textures & helpers =================
+const gc=document.createElement('canvas');gc.width=gc.height=64;{const x=gc.getContext('2d');
+ const g=x.createRadialGradient(32,32,0,32,32,32);g.addColorStop(0,'#fff');g.addColorStop(.25,'rgba(255,255,255,.6)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,64,64)}
+const glow=new THREE.CanvasTexture(gc);
+const dc=document.createElement('canvas');dc.width=dc.height=32;{const x=dc.getContext('2d');
+ const g=x.createRadialGradient(16,16,0,16,16,16);g.addColorStop(0,'#fff');g.addColorStop(.55,'rgba(255,255,255,.9)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,32,32)}
+const dotTex=new THREE.CanvasTexture(dc);
+const fc=document.createElement('canvas');fc.width=fc.height=256;{const fx=fc.getContext('2d'),c=128;
+ let g=fx.createRadialGradient(c,c,0,c,c,128);g.addColorStop(0,'rgba(255,255,255,.55)');g.addColorStop(.1,'rgba(255,255,255,.16)');g.addColorStop(.45,'rgba(255,255,255,.03)');g.addColorStop(1,'rgba(255,255,255,0)');
+ fx.fillStyle=g;fx.fillRect(0,0,256,256);fx.globalCompositeOperation='lighter';fx.lineCap='round';
+ for(let k=0;k<18;k++){const a=k/18*6.283+Math.random()*.25,Ln=38+Math.random()*70,bend=(Math.random()-.5)*1.2;
+  const ex=c+Math.cos(a)*Ln,ey=c+Math.sin(a)*Ln,mx=c+Math.cos(a+bend)*Ln*.5,my=c+Math.sin(a+bend)*Ln*.5;
+  const lg=fx.createLinearGradient(c,c,ex,ey);lg.addColorStop(0,'rgba(255,255,255,.95)');lg.addColorStop(.35,'rgba(255,255,255,.35)');lg.addColorStop(1,'rgba(255,255,255,0)');
+  fx.strokeStyle=lg;fx.lineWidth=.7+Math.random()*.7;fx.beginPath();fx.moveTo(c,c);fx.quadraticCurveTo(mx,my,ex,ey);fx.stroke()}
+ g=fx.createRadialGradient(c,c,0,c,c,9);g.addColorStop(0,'#fff');g.addColorStop(.6,'rgba(255,255,255,.8)');g.addColorStop(1,'rgba(255,255,255,0)');
+ fx.fillStyle=g;fx.beginPath();fx.arc(c,c,9,0,6.283);fx.fill()}
+const flareTex=new THREE.CanvasTexture(fc);
+const lmat=(col,vc)=>new THREE.LineBasicMaterial({color:vc?0xffffff:col,vertexColors:!!vc,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
+const add=(tex,col,sz)=>{const m=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,color:col,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));m.scale.setScalar(sz);m.userData.sz=sz;m.material.opacity=0;S.add(m);return m};
+function label(text,col,px){px=px||44;const c=document.createElement('canvas'),x=c.getContext('2d');
+ const font=px+'px "JetBrains Mono", ui-monospace, monospace';x.font=font;const w=Math.ceil(x.measureText(text).width)+12;
+ c.width=w;c.height=Math.ceil(px*1.4);x.font=font;x.fillStyle=col;x.textBaseline='middle';x.fillText(text,6,c.height/2);
+ const t=new THREE.CanvasTexture(c);t.minFilter=THREE.LinearFilter;
+ const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthWrite:false,opacity:0}));
+ const h=px/44*.8;s.scale.set(h*w/c.height,h,1);S.add(s);return s}
+function kill(o){S.remove(o);if(o.material.map&&![glow,flareTex,dotTex].includes(o.material.map))o.material.map.dispose();o.material.dispose();if(o.geometry&&!o.isSprite)o.geometry.dispose()}
+function star(col,s){const f=add(flareTex,col,4.2*s),c=add(glow,0xffffff,1*s),h=add(glow,0xffc9a8,2.4*s);
+ return{f,c,h,set(p){f.position.copy(p);c.position.copy(p);h.position.copy(p)},
+  op(v){f.material.opacity=v;c.material.opacity=v;h.material.opacity=v*.12;[f,c,h].forEach(m=>m.scale.setScalar(m.userData.sz*CFG.star))},
+  kill(){[f,c,h].forEach(kill)}}}
+
+// deep background
+const shells=[];
+[[80,1800,.18,0x4a5590],[150,2200,.35,0x6a5aa8],[280,1600,.7,0x8a9ad8]].forEach(([r,n,sz,col])=>{
+ const g=new THREE.BufferGeometry(),p=new Float32Array(n*3);
+ for(let i=0;i<n;i++){const u=Math.random()*2-1,a=Math.random()*6.283,d=r*(.6+Math.random()*.4),s=Math.sqrt(1-u*u);
+  p[i*3]=Math.cos(a)*s*d;p[i*3+1]=u*d+8;p[i*3+2]=Math.sin(a)*s*d}
+ g.setAttribute('position',new THREE.BufferAttribute(p,3));
+ const pts=new THREE.Points(g,new THREE.PointsMaterial({size:sz,color:col,map:glow,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+ S.add(pts);shells.push(pts)});
+[[0x1e4a9a,-30,-20,-110,150,.35],[0x5a2a8a,60,20,-130,170,.3],[0x8a5a20,-20,60,-100,130,.22],[0x203a7a,-90,0,-150,150,.25],[0x4a1a5a,80,-30,-160,130,.25]].forEach(([c,x,y,z,s,o])=>{
+ const n=add(glow,c,s);n.position.set(x,y,z);n.material.opacity=o;n.material.fog=false});
+
+
+// =====================================================================
+// network: 6 layers × 16 nodes; random state ↔ trained state (4 meaning clusters)
+// =====================================================================
+const NL=6,NPL=16,LX=l=>-12.5+l*5,INP=V(-17,0,0),OUT=V(17,0,0);
+const CLT=[C.q,C.b,C.a,0xffb59a].map(rgb);
+const LCOL=[...Array(NL)].map((_,l)=>{const a=rgb(C.q),b=rgb(C.b),t=l/(NL-1);return a.map((v,k)=>v+(b[k]-v)*t)});
+const nodes=[];
+for(let l=0;l<NL;l++)for(let i=0;i<NPL;i++){const c=i%4,j=Math.floor(i/4),ang=c*Math.PI/2+Math.PI/4+(j-1.5)*.3,rr=4.6+(j%2)*1;
+ nodes.push({l,c,ph:Math.random()*6.3,r0:V(LX(l)+(Math.random()-.5)*3,(Math.random()-.5)*13,(Math.random()-.5)*13),r1:V(LX(l),Math.cos(ang)*rr,Math.sin(ang)*rr),p:V()})}
+const NN=nodes.length,np=new Float32Array(NN*3),ncol=new Float32Array(NN*3),ng=new THREE.BufferGeometry();
+ng.setAttribute('position',new THREE.BufferAttribute(np,3));ng.setAttribute('color',new THREE.BufferAttribute(ncol,3));
+const nodePts=new THREE.Points(ng,new THREE.PointsMaterial({size:.75,map:dotTex,vertexColors:true,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));S.add(nodePts);
+const links=[];
+for(let l=0;l<NL-1;l++)for(let i=0;i<NPL;i++){const a=l*NPL+i,c=nodes[a].c;
+ const same=[...Array(NPL).keys()].filter(k=>k%4===c).sort(()=>Math.random()-.5).slice(0,2),other=[...Array(NPL).keys()].filter(k=>k%4!==c).sort(()=>Math.random()-.5).slice(0,2);
+ same.forEach(k=>links.push({a,b:(l+1)*NPL+k,l,w0:Math.random(),w1:.7+Math.random()*.3,ph:Math.random()*6.3}));
+ other.forEach(k=>links.push({a,b:(l+1)*NPL+k,l,w0:Math.random(),w1:Math.random()*.06,ph:Math.random()*6.3}))}
+// input / output fan-in
+for(let i=0;i<NPL;i++){links.push({a:-1,b:i,l:-1,w0:Math.random(),w1:.35,ph:Math.random()*6.3});links.push({a:(NL-1)*NPL+i,b:-2,l:NL-1,w0:Math.random(),w1:.35,ph:Math.random()*6.3})}
+const NLK=links.length,lp=new Float32Array(NLK*6),lc=new Float32Array(NLK*6),lg=new THREE.BufferGeometry();
+lg.setAttribute('position',new THREE.BufferAttribute(lp,3));lg.setAttribute('color',new THREE.BufferAttribute(lc,3));
+const linkLines=new THREE.LineSegments(lg,lmat(0,true));S.add(linkLines);
+const rings=[];for(let l=0;l<NL;l++){const pts=[];for(let k=0;k<=64;k++){const a=k/64*6.283;pts.push(V(LX(l),Math.cos(a)*7.4,Math.sin(a)*7.4))}
+ const r=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),lmat(C.q));S.add(r);rings.push(r)}
+const inStar=star(C.q,1.3),outStar=star(C.a,1.3);inStar.set(INP);outStar.set(OUT);
+const labs={};
+function mkLabels(){Object.values(labs).forEach(o=>Array.isArray(o)?o.forEach(kill):kill(o));
+ labs.in=label(L().input,'#7fd4ff',48);labs.in.position.set(INP.x,INP.y-1.6,0);
+ labs.outL=label(L().output,'#ffe7a3',48);labs.outL.position.set(OUT.x,OUT.y-1.6,0);
+ labs.src=L().src.map((t,k)=>{const s=label(t,'#e8ecff',96),a=k/4*6.283+.6;s.position.set(Math.cos(a)*34,Math.sin(a)*14+4,Math.sin(a)*10-8);return s});
+ labs.frags=L().frags.map(t=>label(t,'#8a93b8',56));
+ labs.cl=L().clusters.map((t,c)=>{const s=label(t,'#'+[C.q,C.b,C.a,0xffb59a][c].toString(16).padStart(6,'0'),80),ang=c*Math.PI/2+Math.PI/4;s.position.set(0,Math.cos(ang)*13.5,Math.sin(ang)*13.5);return s});
+ labs.frozen=label(L().frozen,'#cfeeff',60);labs.frozen.position.set(0,11.5,0);
+ fragHome=labs.frags.map(()=>{const u=Math.random()*2-1,a=Math.random()*6.283,s=Math.sqrt(1-u*u),d=26+Math.random()*16;return V(Math.cos(a)*s*d,u*d*.6+3,Math.sin(a)*s*d)});
+ mkCtxLabs();ansLabs.forEach(kill);ansLabs=[];outStr='';outLab&&kill(outLab);outLab=null;sentLab&&kill(sentLab);sentLab=null;barLabs.forEach(kill);barLabs=[];cardLabs.forEach(kill);cardLabs=[];judgeLab&&kill(judgeLab);judgeLab=null;scoreLabs.forEach(kill);scoreLabs=[];curCyc=-1;curRound=-1}
+let fragHome=[],outLab=null,outStr='',sentLab=null,barLabs=[],cardLabs=[],judgeLab=null,scoreLabs=[],curCyc=-1,curRound=-1;
+
+// corpus cloud
+const CN=1100,cp=new Float32Array(CN*3),cg=new THREE.BufferGeometry(),cHome=[],cOff=[];
+for(let i=0;i<CN;i++){const u=Math.random()*2-1,a=Math.random()*6.283,s=Math.sqrt(1-u*u),d=28+Math.random()*26;cHome.push(V(Math.cos(a)*s*d,u*d*.7+3,Math.sin(a)*s*d));cOff.push(Math.random())}
+cg.setAttribute('position',new THREE.BufferAttribute(cp,3));
+const corpus=new THREE.Points(cg,new THREE.PointsMaterial({size:.45,map:dotTex,color:0x9fb8ff,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));S.add(corpus);
+let flow=0,fflow=0;
+
+// meaning clusters
+const clouds=[0,1,2,3].map(c=>{const n=160,p=new Float32Array(n*3),g=new THREE.BufferGeometry(),ang=c*Math.PI/2+Math.PI/4;
+ for(let i=0;i<n;i++){const gx=()=>(Math.random()+Math.random()+Math.random()-1.5);p[i*3]=(Math.random()-.5)*24;p[i*3+1]=Math.cos(ang)*10+gx()*1.6;p[i*3+2]=Math.sin(ang)*10+gx()*1.6}
+ g.setAttribute('position',new THREE.BufferAttribute(p,3));
+ const o=new THREE.Points(g,new THREE.PointsMaterial({size:.4,map:dotTex,color:[C.q,C.b,C.a,0xffb59a][c],transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));S.add(o);return o});
+
+// probability bars (phase 3)
+const BX=20.2,bars=[0,1,2,3,4].map(k=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(1,.55),new THREE.MeshBasicMaterial({color:C.q,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));m.position.set(BX,3-k*1.5,0);S.add(m);return m});
+let probs=[0,0,0,0,0],correctIdx=0;
+function newSentence(ci,ord){const s=L().sent[ci%L().sent.length];sentLab&&kill(sentLab);sentLab=label(s[0]+' ___','#7fd4ff',64);sentLab.position.set(INP.x-1,INP.y+2.4,0);
+ const words=[s[1],...s[2]].map((w,i)=>({w,ok:i===0})).sort(()=>Math.random()-.5);correctIdx=words.findIndex(x=>x.ok);
+ const pc=.07+.78*Math.pow(ord/.75,1.1);let rest=[...Array(5)].map(()=>.2+Math.random());rest[correctIdx]=0;const sm=rest.reduce((a,b)=>a+b,0);
+ probs=rest.map((r,i)=>i===correctIdx?pc:r/sm*(1-pc));
+ barLabs.forEach(kill);barLabs=words.map((x,k)=>{const lb=label(x.w+'  '+Math.round(probs[k]*100)+'%',x.ok?'#ffe7a3':'#8a93b8',52);return lb})}
+
+// RL fan (phase 5)
+const NB=5,branches=[...Array(NB)].map(()=>{const g=new THREE.BufferGeometry(),p=new Float32Array(16*3);g.setAttribute('position',new THREE.BufferAttribute(p,3));const ln=new THREE.Line(g,lmat(C.b));S.add(ln);return{ln,p,st:star(C.b,.8),end:V()}});
+let best=0,scores=[];
+function setupRound(ri){best=Math.floor(Math.random()*NB);scores=[...Array(NB)].map((_,k)=>k===best?.86+Math.random()*.1:.15+Math.random()*.5);
+ branches.forEach((b,k)=>{b.end.set(27+Math.random()*2,(k-2)*3.1+(Math.random()-.5),(Math.random()-.5)*5);
+  const mid=V((OUT.x+b.end.x)/2,(OUT.y+b.end.y)/2+(Math.random()-.5)*3,(b.end.z)/2+(Math.random()-.5)*3);
+  for(let i=0;i<16;i++){const t=i/15,a=(1-t)*(1-t),bb=2*(1-t)*t,c=t*t;b.p[i*3]=OUT.x*a+mid.x*bb+b.end.x*c;b.p[i*3+1]=OUT.y*a+mid.y*bb+b.end.y*c;b.p[i*3+2]=OUT.z*a+mid.z*bb+b.end.z*c}
+  b.ln.geometry.attributes.position.needsUpdate=true;b.st.set(b.end)});
+ judgeLab&&kill(judgeLab);judgeLab=label(L().judges[ri%3],'#ffe7a3',60);judgeLab.position.set(18.5,8.4,0);
+ scoreLabs.forEach(kill);scoreLabs=branches.map((b,k)=>{const s=label(scores[k].toFixed(2),k===best?'#ffe7a3':'#8a93b8',52);s.position.copy(b.end).add(V(1.9,0,0));return s})}
+
+// freeze crystal
+const box=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(31,17,17)),lmat(C.ice));S.add(box);
+
+// context window (phase 8)
+const NC=30,CY=-11.5,cellX=i=>-29+i*2,BLK=[[0,8,C.b],[8,14,C.q],[14,22,0xffb59a],[22,30,C.a]];
+const cells=[...Array(NC)].map((_,i)=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(1.7,.9),new THREE.MeshBasicMaterial({color:BLK.find(b=>i>=b[0]&&i<b[1])[2],transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));m.position.set(cellX(i),CY,0);S.add(m);return m});
+const feed=new THREE.Line(new THREE.BufferGeometry().setFromPoints([V(cellX(0)-1.5,CY,0),V(-21,CY,0),V(-20,-1,0),INP]),lmat(C.q));S.add(feed);
+const loopG=new THREE.BufferGeometry().setFromPoints([...Array(24)].map(()=>V()));const loop=new THREE.Line(loopG,lmat(C.a));S.add(loop);
+let ansLabs=[],ctxLabs=[];
+function mkCtxLabs(){ctxLabs.forEach(kill);ctxLabs=BLK.map((b,k)=>{const s=label(L().ctxB[k],'#'+b[2].toString(16).padStart(6,'0'),46);s.position.set((cellX(b[0])+cellX(b[1]-1))/2,CY+1.4,0);return s});
+ const t=label(L().ctxTitle,'#8a93b8',52);t.position.set(0,CY-1.6,0);ctxLabs.push(t);const w=label(L().wipe,'#cfeeff',60);w.position.set(0,CY-3.4,0);ctxLabs.push(w)}
+const arcP=(k,t)=>{const a=OUT,b=V(cellX(22+k),CY,0),c=V((a.x+b.x)/2+6,-3,5);const u=1-t;return V(a.x*u*u+c.x*2*u*t+b.x*t*t,a.y*u*u+c.y*2*u*t+b.y*t*t,a.z*u*u+c.z*2*u*t+b.z*t*t)};
+// output text
+function setOut(s){if(s===outStr)return;outStr=s;outLab&&kill(outLab);outLab=null;if(!s)return;outLab=label(L().out+s,'#e8ecff',56);outLab.position.set(OUT.x+2,OUT.y-4.4,0)}
+const GARB='ъыщзхжэ7#ёфпролqzxk';const garb=()=>[...Array(4)].map(()=>[...Array(2+Math.floor(Math.random()*5))].map(()=>GARB[Math.floor(Math.random()*GARB.length)]).join('')).join(' ');
+let garbT=0;
+
+// loss plot
+const lpc=$('lossplot'),lpx=lpc.getContext('2d');let lossHist=[],lossT=0;
+function drawLoss(){lpx.clearRect(0,0,280,72);lpx.strokeStyle='rgba(138,147,184,.35)';lpx.lineWidth=1;lpx.beginPath();lpx.moveTo(0,71);lpx.lineTo(280,71);lpx.stroke();
+ if(lossHist.length<2)return;lpx.strokeStyle='#ff8a7a';lpx.lineWidth=2;lpx.beginPath();lossHist.forEach((v,i)=>{const x=i/(Math.max(lossHist.length,120)-1)*280,y=70-v/11*66;i?lpx.lineTo(x,y):lpx.moveTo(x,y)});lpx.stroke()}
+
+// =====================================================================
+// phases & UI
+// =====================================================================
+let phase=0,pt=0,auto=true,DUR=8,T=0,finished=false;
+const rail=$('rail'),say=$('say');
+const r1=document.createElement('div'),r2=document.createElement('div');r1.className=r2.className='row';rail.append(r1,r2);
+function setPhase(i){if(i<7){finished=false;agb.hidden=true}
+ if(i===0){lossHist=[];drawLoss()}
+ phase=i;pt=0;DUR=DURS[i]*CFG.dur;curCyc=-1;curRound=-1;ansLabs.forEach(kill);ansLabs=[];
+ [...r1.children].forEach((b,k)=>b.classList.toggle('on',k===i));
+ say.style.opacity=0;setTimeout(()=>{say.textContent=L().ph[phase][2];say.style.opacity=1},250)}
+function nextPhase(){if(phase===7){if(!finished){finished=true;agb.hidden=false;auto=false;ab.classList.remove('on')}return}setPhase(phase+1)}
+for(let i=0;i<8;i++){const b=document.createElement('button');b.onclick=()=>{auto=false;ab.classList.remove('on');setPhase(i)};r1.appendChild(b)}
+const ab=document.createElement('button');ab.className='on';ab.onclick=()=>{auto=!auto;ab.classList.toggle('on',auto)};r2.appendChild(ab);
+const cb=document.createElement('button');function updCamBtn(){cb.textContent=camAuto?L().camA:L().camF;cb.classList.toggle('on',camAuto)}
+cb.onclick=()=>{camAuto=!camAuto;lastTouch=performance.now();updCamBtn()};r2.appendChild(cb);
+const gb=document.createElement('button');gb.setAttribute('aria-controls','cfg');gb.onclick=()=>{const c=$('cfg');c.hidden=!c.hidden;gb.classList.toggle('on',!c.hidden)};r2.appendChild(gb);
+const lb2=document.createElement('button');lb2.onclick=()=>{LANG=LANG==='ru'?'en':'ru';try{localStorage.setItem('anatlang',LANG)}catch(e){}applyLang();mkLabels();setPhase(phase)};r2.appendChild(lb2);
+const agb=document.createElement('button');agb.className='again';agb.hidden=true;agb.onclick=()=>{auto=true;ab.classList.add('on');setPhase(0)};r2.appendChild(agb);
+function applyLang(){document.documentElement.lang=LANG;document.querySelectorAll('[data-t]').forEach(el=>el.textContent=L()[el.dataset.t]);
+ [...r1.children].forEach((b,i)=>b.textContent=L().ph[i][0]+' '+L().ph[i][1]);
+ ab.textContent=L().auto;updCamBtn();gb.textContent=L().gear;lb2.textContent=L().lang;agb.textContent=L().again;placeSay()}
+function placeSay(){const h=rail.getBoundingClientRect().height;say.style.bottom=(h+14)+'px';$('cfg').style.bottom=(h+12)+'px'}
+addEventListener('resize',placeSay);
+function applyCfg(){R.domElement.style.filter='brightness('+CFG.br+')';
+ for(const k in CFG){const i=$('c-'+k);if(i){i.value=CFG[k];$('o-'+k).textContent=fmt[k](CFG[k])}}
+ try{localStorage.setItem('traincfg',JSON.stringify(CFG))}catch(e){}}
+for(const k in CFG0){const i=$('c-'+k);i.addEventListener('input',()=>{CFG[k]=+i.value;applyCfg()})}
+$('c-reset').onclick=()=>{Object.assign(CFG,CFG0);applyCfg()};
+
+// ================= frame loop =================
+let last=performance.now();
+const BLUE=rgb(C.q),RED=rgb(C.g),GOLD=rgb(C.a),ICE=rgb(C.ice);
+function tick(now){
+ const dt=Math.min((now-last)/1000,.05)*CFG.speed;last=now;T+=dt;pt+=dt;
+ if(auto&&pt>DUR)nextPhase();
+ if(!camAuto&&now-lastTouch>8000){camAuto=true;updCamBtn()}
+ const u=Math.min(1,pt/DUR);
+ const ord=phase<2?0:phase===2?.75*u:phase===3?.75+.25*u:1;
+ const sft=phase<4?0:phase===4?u:1,rl=phase<5?0:phase===5?u:1,frz=phase===6?ease(u*1.6):phase===7?1:0;
+ const netA=phase===0?ease((u-.6)/.35)*.6:1;
+ let pp=-9,pa=0,pcol=BLUE;
+
+ // ---- phase 2: next-token cycles ----
+ let barA=0,hiA=0;
+ if(phase===2){const NS=L().sent.length,cyc=u*NS,ci=Math.min(NS-1,Math.floor(cyc)),ct=cyc-ci;
+  if(ci!==curCyc){curCyc=ci;newSentence(ci,ord)}
+  if(ct<.3){pp=-1+ct/.3*7;pa=1;pcol=BLUE}else if(ct>.55&&ct<.92){pp=6-(ct-.55)/.37*7;pa=1.3;pcol=RED}
+  barA=ease((ct-.28)/.1)*(1-ease((ct-.93)/.07));hiA=ease((ct-.42)/.1)}
+ else if(sentLab){kill(sentLab);sentLab=null;barLabs.forEach(kill);barLabs=[]}
+ if(sentLab)sentLab.material.opacity=phase===2?.95:0;
+ bars.forEach((m,k)=>{const w=Math.max(.05,probs[k]*7);m.scale.x=w;m.position.x=BX+w/2;m.material.opacity=barA*(k===correctIdx?.55+hiA*.4:.35);m.material.color.setHex(k===correctIdx&&hiA>.5?C.a:C.q);
+  const lb=barLabs[k];if(lb){lb.position.set(BX-lb.scale.x/2-.3,m.position.y,0);lb.material.opacity=barA*(k===correctIdx?.6+hiA*.4:.7)}});
+
+ // ---- phase 4: example cards descend ----
+ if(phase===4){const ci=Math.min(2,Math.floor(u*3)),ct=u*3-ci;
+  if(ci!==curCyc){curCyc=ci;cardLabs.forEach(kill);const c=L().cards[ci];cardLabs=[label(c[0],'#7fd4ff',60),label(c[1],'#ffe7a3',60)]}
+  const k=ease(ct/.55),y=15-k*(15-INP.y),x=-6+k*(INP.x+6),a=(1-ease((ct-.45)/.12))*ease(ct/.08);
+  cardLabs[0].position.set(x,y+.55,0);cardLabs[1].position.set(x,y-.45,0);cardLabs.forEach(s=>{s.material.opacity=a;s.scale.multiplyScalar(1)});
+  if(ct>.55&&ct<.75){pp=-1+(ct-.55)/.2*7;pa=1;pcol=GOLD}else if(ct>.75&&ct<.97){pp=6-(ct-.75)/.22*7;pa=1;pcol=RED}}
+ else if(cardLabs.length){cardLabs.forEach(kill);cardLabs=[]}
+
+ // ---- phase 5: answer fan, judging, reward ----
+ if(phase===5){const ri=Math.min(2,Math.floor(u*3)),rt=u*3-ri;if(ri!==curRound){curRound=ri;setupRound(ri)}
+  const grow=ease(rt/.22),dec=ease((rt-.5)/.12),sc=ease((rt-.27)/.08);
+  branches.forEach((b,k)=>{b.ln.geometry.setDrawRange(0,Math.max(2,Math.floor(grow*16)));const isB=k===best;
+   b.ln.material.color.setHex(isB&&dec>.5?C.a:C.b);b.ln.material.opacity=(.55+(isB?dec*.45:-dec*.45))*Math.min(1,CFG.dens);
+   b.st.op(grow>.98?(isB?.6+dec*.4:.6-dec*.45):0);b.st.f.material.color.setHex(isB&&dec>.5?C.a:C.b);scoreLabs[k].material.opacity=sc*(isB?1:.75-dec*.4)});
+  judgeLab.material.opacity=ease(rt/.1)*(1-ease((rt-.95)/.05))*.95;
+  if(rt>.68&&rt<.98){pp=6-(rt-.68)/.3*7;pa=1.4;pcol=GOLD}}
+ else{branches.forEach(b=>{b.ln.material.opacity=0;b.st.op(0)});if(judgeLab){kill(judgeLab);judgeLab=null;scoreLabs.forEach(kill);scoreLabs=[]}}
+
+ // ---- phase 8: conversation over a frozen model ----
+ let ctxN=0;
+ {const on=phase===7,wipe=on?ease((u-.9)/.08):0;
+  cells.forEach((m,i)=>{let a=0;if(on){if(i<22)a=ease((u-.02-i*.012)/.02);else{const k=i-22,st=.3+k*.07;a=ease((u-st-.06)/.01)}}m.material.opacity=a*.55*(1-wipe);if(a>.5&&wipe<.5)ctxN=i+1});
+  feed.material.opacity=on?.35*(1-wipe):0;
+  ctxLabs.forEach((s,k)=>{s.material.opacity=!on?0:k<3?ease((u-.02-[0,.1,.17][k])/.04)*(1-wipe):k===3?ease((u-.3)/.04)*(1-wipe):k===4?ease(u/.05)*(1-wipe):wipe});
+  if(on&&u>.3&&u<.86){const k=Math.min(7,Math.floor((u-.3)/.07)),t=(u-.3)/.07-k;
+   pp=-1+Math.min(1,t/.6)*7;pa=t<.6?1:0;pcol=BLUE;
+   while(ansLabs.length<=k){const s=label(L().ans[ansLabs.length],'#ffe7a3',50);s.position.copy(OUT);ansLabs.push(s)}
+   const ft=ease((t-.6)/.4);if(t>.6){const pts=[];for(let j=0;j<24;j++)pts.push(arcP(k,j/23*ft));loopG.setFromPoints(pts);loop.material.opacity=.6}else loop.material.opacity=0}
+  else loop.material.opacity=0;
+  ansLabs.forEach((s,k)=>{const st=.3+k*.07,t=on?clamp((u-st)/.07):1,ft=ease((t-.6)/.4);s.position.copy(t<.6?OUT.clone().add(V(1.5,1.4,0)):arcP(k,ft));if(ft>=1)s.position.y=CY;s.material.opacity=on?(t<.55?ease((t-.45)/.1):1)*(1-wipe):0});}
+
+ // ---- network ----
+ const flick=reduce?.3:1,dens=CFG.dens;
+ nodes.forEach((n,i)=>{n.p.lerpVectors(n.r0,n.r1,ease(ord/ .9));const j=(1-ord)*(1-frz)*.35*flick;n.p.x+=Math.sin(T*1.3+n.ph)*j;n.p.y+=Math.cos(T*1.1+n.ph)*j;
+  np[i*3]=n.p.x;np[i*3+1]=n.p.y;np[i*3+2]=n.p.z;
+  const h=pa*Math.exp(-((n.l-pp)**2)*2.5),base=LCOL[n.l],cl=CLT[n.c],m=ord*.7;
+  for(let k=0;k<3;k++){let v=(base[k]*(1-m)+cl[k]*m)*(.45+.35*ord);v=v*(1-frz)+ICE[k]*.7*frz;ncol[i*3+k]=Math.min(1,v+pcol[k]*h)}});
+ ng.attributes.position.needsUpdate=true;ng.attributes.color.needsUpdate=true;nodePts.material.opacity=netA;nodePts.material.size=.75*CFG.star/.9;
+ links.forEach((k,i)=>{const A=k.a===-1?INP:k.a===-2?OUT:nodes[k.a].p,B=k.b===-1?INP:k.b===-2?OUT:nodes[k.b].p,q=i*6;
+  lp[q]=A.x;lp[q+1]=A.y;lp[q+2]=A.z;lp[q+3]=B.x;lp[q+4]=B.y;lp[q+5]=B.z;
+  const fl=k.w0*(.5+.5*Math.sin(T*6*flick+k.ph))*(1-ord),w=(fl+k.w1*ord)*(1-frz*.3),h=pa*Math.exp(-((k.l+.5-pp)**2)*2.5),lc0=LCOL[Math.max(0,Math.min(NL-1,k.l))];
+  for(let c=0;c<3;c++){let v=lc0[c]*w*.8*dens;v=v*(1-frz)+ICE[c]*k.w1*.5*frz*dens;const vv=Math.min(1,v+pcol[c]*h*.9);lc[q+c]=vv;lc[q+3+c]=vv}});
+ lg.attributes.position.needsUpdate=true;lg.attributes.color.needsUpdate=true;linkLines.material.opacity=netA;
+ rings.forEach((r,l)=>{r.material.opacity=netA*(.1+pa*Math.exp(-((l-pp)**2)*2.5)*.4);r.material.color.setRGB(...(pa>0?pcol:frz>0?ICE:BLUE))});
+ inStar.op(netA*(phase===2||phase===4?.8:.55));outStar.op(netA*(phase===5?1:.6));
+ labs.in.material.opacity=netA*.7;labs.outL.material.opacity=netA*(phase===5?.4:.7);
+ box.material.opacity=frz*.45;
+
+ // ---- corpus ----
+ const cA=phase===0?ease(u/.25):phase===1?.35:phase===2?.6:phase===3?.25:.08;
+ flow+=dt*(phase===0||phase===2?.07:.008);fflow+=dt*(phase===0?.05:phase===2?.03:.004);
+ for(let i=0;i<CN;i++){const f=(flow+cOff[i])%1,e=f*f*f;const h=cHome[i];cp[i*3]=h.x+(INP.x-h.x)*e;cp[i*3+1]=h.y+(INP.y-h.y)*e;cp[i*3+2]=h.z+(INP.z-h.z)*e}
+ cg.attributes.position.needsUpdate=true;corpus.material.opacity=cA*.85;
+ labs.frags.forEach((s,i)=>{const f=(fflow+i/labs.frags.length)%1,e=f*f*.92,h=fragHome[i];s.position.set(h.x+(INP.x-h.x)*e,h.y+(INP.y-h.y)*e,h.z+(INP.z-h.z)*e);
+  s.material.opacity=(phase===0?ease(u/.3):phase===2?.4:0)*Math.min(1,(1-f)*4)*Math.min(1,f*8+.2)});
+ labs.src.forEach(s=>s.material.opacity=phase===0?ease((u-.1)/.2)*(1-ease((u-.8)/.2)):0);
+
+ // ---- meaning clusters ----
+ const clA=phase===3?ease(u/.5):phase>3&&phase<6?.25:phase===6?.25*(1-frz):0;
+ clouds.forEach(o=>o.material.opacity=clA*.8);labs.cl.forEach(s=>s.material.opacity=phase===3?clA:0);
+ labs.frozen.material.opacity=frz*.95;
+
+ // ---- output text ----
+ if(phase===1){garbT-=dt;if(garbT<=0){garbT=.35;outStr='';setOut(garb())}}
+ else if(phase===2)setOut(ord<.18?(garbT-=dt,garbT<=0?(garbT=.35,outStr='',garb()):outStr):L().outs[ord<.4?0:ord<.6?1:2]);
+ else if(phase===3)setOut(L().outs[2]);
+ else if(phase===4)setOut(u<.5?L().outCont:L().outAns);
+ else if(phase===6)setOut(L().outAns);
+ else if(phase===7)setOut('');
+ else setOut('');
+ if(outLab)outLab.material.opacity=netA*.9;
+
+ // ---- camera ----
+ if(camAuto){const a=T*.1*(reduce?.4:1),far=innerWidth<700?1.6:1;let P,Tg;
+  if(phase===0){P=V(Math.sin(a)*24,10,74*far);Tg=V(0,2,0)}
+  else if(phase===1){P=V(Math.sin(a*1.3)*12,6,32*far);Tg=V(0,0,0)}
+  else if(phase===2){P=V(3+Math.sin(a)*5,4,38*far);Tg=V(3,0,0)}
+  else if(phase===3){P=V(Math.sin(a*2.2)*34,10,Math.cos(a*2.2)*34*far);Tg=V(0,0,0)}
+  else if(phase===4){P=V(-3+Math.sin(a)*6,7,36*far);Tg=V(-2,3,0)}
+  else if(phase===5){P=V(8+Math.sin(a)*5,5,38*far);Tg=V(7,1,0)}
+  else if(phase===6){P=V(Math.sin(a)*10,7,(46+frz*12)*far);Tg=V(0,1,0)}
+  else{P=V(Math.sin(a)*5,1,56*far);Tg=V(0,-3,0)}
+  const f=1-Math.exp(-dt*(reduce?.5:.9)*CFG.cam);cam.position.lerp(P,f);ctl.target.lerp(Tg,f)}
+ shells.forEach((s,i)=>s.rotation.y=T*.003*(i+1));
+
+ // ---- HUD ----
+ const loss=phase<2?null:phase<4?2.1+8.7*Math.pow(1-ord,2.2):phase===4?2.1-.6*sft:1.5;
+ $('h-stage').textContent=L().stage[phase];$('h-data').textContent=L().data[phase];$('h-sig').textContent=L().sig[phase];$('h-w').textContent=L().wState[phase];
+ const steps=Math.floor(ord*640000+sft*12000+rl*8000);$('h-step').textContent=steps.toLocaleString(LANG==='ru'?'ru-RU':'en-US');
+ $('h-loss').textContent=loss==null?'—':loss.toFixed(2);$('h-bar').style.width=loss==null?'0':(loss/10.8*100).toFixed(1)+'%';
+ lossT-=dt;if(lossT<=0&&loss!=null&&phase<6){lossT=.12;lossHist.push(loss+(phase===2?(Math.random()-.5)*.5*(1-ord):0));drawLoss()}
+ const sk=[clamp(ord*2.2),clamp(ord*1.6-.3),clamp(ord*1.3-.5)*.6+rl*.4,sft*.85+rl*.15,sft*.3+rl*.7];
+ sk.forEach((v,i)=>$('s'+i).style.width=(v*100).toFixed(1)+'%');
+ $('h-ctx').textContent=phase===7?(ctxN*37).toLocaleString(LANG==='ru'?'ru-RU':'en-US'):'—';$('h-ctxb').style.width=phase===7?(ctxN/NC*100)+'%':'0';
+ ctl.update();R.render(S,cam);requestAnimationFrame(tick)}
+
+function start(){applyLang();applyCfg();mkLabels();setPhase(0);requestAnimationFrame(tick)}
+let started=false;const go=()=>{if(!started){started=true;start()}};
+(document.fonts&&document.fonts.load?document.fonts.load('44px "JetBrains Mono"'):Promise.resolve()).then(go,go);setTimeout(go,1500);
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)});
+</script>
+
+<script>(function(){if(!new URLSearchParams(location.search).has('embed'))return;document.documentElement.classList.add('embed');
+let sent=false;const orig=nextPhase;nextPhase=function(){if(phase===(7)){if(!sent){sent=true;parent.postMessage({t:'done'},'*')}return}orig()};
+addEventListener('message',e=>{if(e.source!==parent)return;const d=e.data||{};if(d.t==='go'){sent=false;live=true;VO=d.vo||[];auto=true;try{ab.classList.add('on');camAuto=true;updCamBtn()}catch(_){}setPhase(0)}else if(d.t==='pause'){auto=false}});
+let VO=[],live=false;auto=false;const os=setPhase;setPhase=function(i){os(i);const k=i-(0),v=VO[k];if(v)DUR=Math.max(DUR,(v+.9)*CFG.speed);if(live)parent.postMessage({t:'phase',k},'*')};
+parent.postMessage({t:'ready'},'*')})()</script>
+</body></html>
